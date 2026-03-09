@@ -1,0 +1,28 @@
+{
+  "status": "PASS",
+  "summary": "RR-CONSOLE-001 satisfies all 6 hard gates: release summary with outcome, strategy, and exposure percentage; deployment evidence for all 8 RP steps with concrete evidence and 3 documented deviations; exposure log for both RP stages with observed signal values and named decision maker; monitoring observations with specific metric values, timestamps, and watch period summary; release disposition with final state and exposure state; and handoff declaration with production state, active monitoring, SLO baselines, incident assessment, and 3 recommended watch items.",
+  "hard_gates": {
+    "release_summary": "PASS",
+    "deployment_evidence": "PASS",
+    "exposure_log": "PASS",
+    "monitoring_observations": "PASS",
+    "release_disposition": "PASS",
+    "handoff_declaration": "PASS"
+  },
+  "blocking_issues": [],
+  "warnings": [
+    {
+      "description": "Watch period was abbreviated from the RP-specified 1 hour to approximately 15 minutes. The rationale is documented (automated verification + mock provider context), but this is a deviation from RP §6. The release owner accepted this as sufficient for the initial release context.",
+      "location": "§5 Watch Period Summary"
+    },
+    {
+      "description": "LLM duration metrics (llm_generation_duration, llm_validation_duration) report N/A due to mock provider usage. SLO baseline for LLM API call duration is listed as 'Not yet established.' These will need to be captured on first real LLM usage and documented in a Layer 6 record.",
+      "location": "§5 Metrics During Watch Period; §7 SLO Baseline"
+    },
+    {
+      "description": "Version identifier is a Docker image SHA rather than a git tag or semantic version. Acceptable for first release but a versioning convention should be established for subsequent releases.",
+      "location": "§7 What is in production"
+    }
+  ],
+  "completeness_score": "90"
+}

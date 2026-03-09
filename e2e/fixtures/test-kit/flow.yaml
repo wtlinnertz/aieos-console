@@ -1,0 +1,38 @@
+kit:
+  name: "E2E Test Kit"
+  id: "e2e-test-kit"
+  version: "1.0.0"
+steps:
+  - id: "step-prd"
+    name: "Product Requirements"
+    artifact_type: "prd"
+    step_type: "llm-generated"
+    dependencies: []
+    four_files:
+      spec: "docs/specs/prd-spec.md"
+      template: "docs/artifacts/prd-template.md"
+      prompt: "docs/prompts/prd-prompt.md"
+      validator: "docs/validators/prd-validator.md"
+    required_inputs:
+      - path: "docs/brief.md"
+        role: "brief"
+    produces:
+      artifact_id_prefix: "PRD"
+      output_filename: "01-prd.md"
+    freeze_gate: true
+  - id: "step-acf"
+    name: "Acceptance Criteria"
+    artifact_type: "acf"
+    step_type: "llm-generated"
+    dependencies:
+      - "step-prd"
+    four_files:
+      spec: "docs/specs/acf-spec.md"
+      template: "docs/artifacts/acf-template.md"
+      prompt: "docs/prompts/acf-prompt.md"
+      validator: "docs/validators/acf-validator.md"
+    required_inputs: []
+    produces:
+      artifact_id_prefix: "ACF"
+      output_filename: "02-acf.md"
+    freeze_gate: true

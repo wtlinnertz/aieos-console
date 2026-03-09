@@ -1,0 +1,30 @@
+{
+  "status": "PASS",
+  "summary": "RP-CONSOLE-001 satisfies all 8 hard gates: upstream references complete with ORD and RCF confirmed Frozen, deployment specification with 8 concrete steps referencing ORD sections, exposure specification with 2 stages and justified RCF exception for direct-full, rollback specification with 4 conditions as observable signals and named responsible party, communication plan covering all RCF audiences with timing and channels, monitoring plan with 7 named metrics and baselines and 1-hour watch period, scope matches RER declaration, and open issues section present with no blocking items.",
+  "hard_gates": {
+    "upstream_references": "PASS",
+    "deployment_specification": "PASS",
+    "exposure_specification": "PASS",
+    "rollback_specification": "PASS",
+    "communication_plan": "PASS",
+    "monitoring_plan": "PASS",
+    "scope_bounded": "PASS",
+    "readiness": "PASS"
+  },
+  "blocking_issues": [],
+  "warnings": [
+    {
+      "description": "§2 Configuration Changes lists LLM_MODEL example as 'claude-sonnet-4-20250514' — this is a specific model ID that may not match the user's provider or preferred model. The value is correctly marked as user-chosen, but the example could mislead if copied verbatim.",
+      "location": "§2 Configuration Changes"
+    },
+    {
+      "description": "§4 Rollback Procedure notes that rollback to a previous version is not applicable for the first release — this is accurate and correctly documented, but means the rollback procedure is effectively 'stop container and preserve data' rather than a traditional version rollback. Acceptable for first release.",
+      "location": "§4 Rollback Procedure"
+    },
+    {
+      "description": "§6 monitoring relies on manual polling (curl, docker inspect, log review) rather than automated monitoring dashboards. This is appropriate for a single-user local deployment but means metric observation depends on the release owner's discipline during the watch period.",
+      "location": "§6 Post-Release Monitoring Plan"
+    }
+  ],
+  "completeness_score": "93"
+}

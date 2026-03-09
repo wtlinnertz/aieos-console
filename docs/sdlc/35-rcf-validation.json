@@ -1,0 +1,29 @@
+{
+  "status": "PASS",
+  "summary": "RCF-AIEOS-001 satisfies all 7 hard gates: document control complete, deployment standards with 2 risk tiers and verification requirements, exposure standards with explicit progressive delivery policy and flag governance, authorization model with 2 levels and specific thresholds, communication requirements with timing, monitoring requirements with 4 metric categories and clock durations, and all standards use enforceable language throughout.",
+  "hard_gates": {
+    "document_control": "PASS",
+    "deployment_standards": "PASS",
+    "exposure_standards": "PASS",
+    "authorization_model": "PASS",
+    "communication_requirements": "PASS",
+    "monitoring_requirements": "PASS",
+    "standard_enforceability": "PASS"
+  },
+  "blocking_issues": [],
+  "warnings": [
+    {
+      "description": "§2 Deployment Standards lists canary, blue-green, and rolling as 'Not applicable — strategy not used in scope' rather than 'Not permitted.' This is accurate for the current scope but could be ambiguous if a future system within this RCF's scope does have traffic splitting infrastructure. The §7 exception table partially addresses this.",
+      "location": "§2 Verification Requirements"
+    },
+    {
+      "description": "§3 Exposure Standards states maximum exposure increment as '100 percentage points' and minimum observation period between stages as 'Not applicable.' While correctly justified for single-user deployment, the post-deployment watch period of 1 hour is defined only in the rollout constraints prose and in §6, not as a formal stage observation period. This is acceptable given the single-user context but unusual for an RCF.",
+      "location": "§3 Rollout Constraints"
+    },
+    {
+      "description": "§5 Communication Requirements specifies channel as 'Project communication channel (e.g., chat, email)' — the parenthetical examples use aspirational-adjacent phrasing but the standard itself ('Project communication channel') is concrete enough to evaluate compliance. Borderline but acceptable.",
+      "location": "§5 Internal Stakeholder Notifications"
+    }
+  ],
+  "completeness_score": "91"
+}
