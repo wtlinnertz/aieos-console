@@ -30,11 +30,13 @@
 
 **Key decisions:**
 
-- Classification: Classified as Feature with Full discovery depth — net-new capability, no existing tooling — WCR-CONSOLE-001
-- Intake correction: Initial intake failed no_solutions gate due to technology references (Next.js, Docker, lock file); corrected to remove solution content — 01-discovery-intake.md
-- UG-2 inclusion: Despite inconclusive ASM-2 evidence, initiative owner decided to include non-technical user features in phase 1 based on PM feedback indicating general self-service preference — EL-CONSOLE-001 OQ-1
-- LLM strategy: Build with single LLM support initially, architect for multi-provider — EL-CONSOLE-001 OQ-2
-- Engagement Record missed: ER should have been created at Discovery Intake validation per PIK playbook; created retroactively — this is exactly the kind of manual process error (PP-2) the console is being built to prevent
+| Decision ID | Type | Description | Artifact | Date |
+|-------------|------|-------------|----------|------|
+| DEC-CONSOLE-001 | scope | Classified as Feature with Full discovery depth — net-new capability, no existing tooling | WCR-CONSOLE-001 | 2026-03-07 |
+| DEC-CONSOLE-002 | scope | Initial intake failed no_solutions gate due to technology references (Next.js, Docker, lock file); corrected to remove solution content | 01-discovery-intake.md | 2026-03-07 |
+| DEC-CONSOLE-003 | scope | Despite inconclusive ASM-2 evidence, initiative owner decided to include non-technical user features in phase 1 based on PM feedback indicating general self-service preference | EL-CONSOLE-001 | 2026-03-07 |
+| DEC-CONSOLE-004 | architectural | Build with single LLM support initially, architect for multi-provider | EL-CONSOLE-001 | 2026-03-07 |
+| DEC-CONSOLE-005 | process | ER should have been created at Discovery Intake validation per PIK playbook; created retroactively | ER-CONSOLE-001 | 2026-03-07 |
 
 ---
 
@@ -55,8 +57,10 @@
 
 **Key decisions:**
 
-- Architectural amendment: SAD amended to require kit-provided machine-readable flow definitions that declare artifact sequence, step types, dependencies, and freeze gates; dynamic file discovery alone moves hardcoding one layer deeper; spec-driven approach makes NFR-3 fully achievable — SAD-CONSOLE-001
-- DCF correction: Initial DCF draft referenced principles files in Purpose but did not translate individual directives into enforceable standards; caught during review and corrected; root cause was EEK prompts not requiring principles files as named inputs — DCF-CONSOLE-001
+| Decision ID | Type | Description | Artifact | Date |
+|-------------|------|-------------|----------|------|
+| DEC-CONSOLE-006 | architectural | SAD amended to require kit-provided machine-readable flow definitions that declare artifact sequence, step types, dependencies, and freeze gates; spec-driven approach makes NFR-3 fully achievable | SAD-CONSOLE-001 | 2026-03-07 |
+| DEC-CONSOLE-007 | scope | Initial DCF draft referenced principles files in Purpose but did not translate individual directives into enforceable standards; caught during review and corrected; root cause was EEK prompts not requiring principles files as named inputs | DCF-CONSOLE-001 | 2026-03-07 |
 
 **Framework findings (AIEOS process improvement observations):**
 
@@ -87,11 +91,13 @@ None.
 
 **Key decisions:**
 
-- Release type: Direct-full exposure chosen; progressive exposure not applicable for a local CLI tool with no shared infrastructure — RER-CONSOLE-001
-- RCF scope: RCF scoped as org-level (RCF-AIEOS-001), reusable across all AIEOS local tool releases, not initiative-specific — RCF-AIEOS-001
-- Pseudonym: Release owner used pseudonym with traceability note after initial validator failure on role title ("Initiative Owner"); triggered REK-FINDING-1 — RER-CONSOLE-001
-- Mock provider: Release verification used mock LLM provider instead of real provider; watch period shortened from 1 hour to ~15 minutes; deviation documented in RR with compensating evidence — RR-CONSOLE-001
-- Deferred baseline: LLM duration metrics baseline deferred to Layer 6 with "capture on first real provider use" trigger — RR-CONSOLE-001
+| Decision ID | Type | Description | Artifact | Date |
+|-------------|------|-------------|----------|------|
+| DEC-CONSOLE-008 | release-strategy | Direct-full exposure chosen; progressive exposure not applicable for a local CLI tool with no shared infrastructure | RER-CONSOLE-001 | 2026-03-08 |
+| DEC-CONSOLE-009 | scope | RCF scoped as org-level (RCF-AIEOS-001), reusable across all AIEOS local tool releases, not initiative-specific | RCF-AIEOS-001 | 2026-03-08 |
+| DEC-CONSOLE-010 | process | Release owner used pseudonym with traceability note after initial validator failure on role title; triggered REK-FINDING-1 | RER-CONSOLE-001 | 2026-03-08 |
+| DEC-CONSOLE-011 | release-strategy | Release verification used mock LLM provider instead of real provider; watch period shortened from 1 hour to ~15 minutes; deviation documented with compensating evidence | RR-CONSOLE-001 | 2026-03-08 |
+| DEC-CONSOLE-012 | scope | LLM duration metrics baseline deferred to Layer 6 with "capture on first real provider use" trigger | RR-CONSOLE-001 | 2026-03-08 |
 
 **Framework findings (AIEOS process improvement observations):**
 
