@@ -139,7 +139,7 @@ The engagement record tracking all artifacts across layers is at `docs/engagemen
 
 - [aieos-governance-foundation](https://github.com/wtlinnertz/aieos-governance-foundation) — Canonical authority for all structural rules and the layer model
 - [aieos-product-intelligence-kit](https://github.com/wtlinnertz/aieos-product-intelligence-kit) — Layer 2: Product discovery through engineered PRD
-- [aieos-engineering-execution-kit](https://github.com/wtlinnertz/aieos-engineering-execution) — Layer 4: Design through deployable code
+- [aieos-engineering-execution-kit](https://github.com/wtlinnertz/aieos-engineering-execution-kit) — Layer 4: Design through deployable code
 - [aieos-release-exposure-kit](https://github.com/wtlinnertz/aieos-release-exposure-kit) — Layer 5: Safe deployment to production
 
 ---
