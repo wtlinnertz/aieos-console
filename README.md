@@ -1,56 +1,38 @@
 # aieos-console
 
-**A browser-based guided wizard for running AIEOS governance processes.**
+A browser-based wizard for running AIEOS governance processes.
 
----
+## How to use it
 
-## What This Is
-
-**aieos-console** is a locally deployed web application that guides users through the [AIEOS](https://github.com/wtlinnertz/aieos-governance-foundation) governance framework — from product discovery (PIK) through engineering execution (EEK).
+**aieos-console** is a locally deployed web app that guides you through the [AIEOS](https://github.com/wtlinnertz/aieos-governance-foundation) governance framework: from product discovery (PIK) through engineering execution (EEK).
 
 It provides:
-- A step-by-step wizard UI that renders from kit-provided flow definitions
-- LLM integration for artifact generation and validation
-- State management with freeze-before-promote enforcement
-- A spec-driven architecture where any AIEOS kit can define its own wizard flow
+- Step-by-step wizard UI that renders from kit-provided flow definitions.
+- LLM integration for artifact generation and validation.
+- State management with freeze-before-promote enforcement.
+- Spec-driven architecture where any AIEOS kit can define its own wizard flow.
 
-This is the first application built using the AIEOS framework and serves as both a product and a framework validation exercise.
+This is the first application built using the AIEOS framework and validates the framework itself as both a product and a governance tool.
 
----
+## What it solves
 
-## What Problem This Solves
+Running AIEOS manually means tracking artifact sequences by hand, providing the right inputs to each generation prompt, managing freeze states, and keeping artifacts consistent. That's error-prone. The console automates it:
+- Sequences artifacts automatically from kit definitions.
+- Enforces dependency gates (upstream artifacts must be frozen before downstream generation).
+- Integrates LLM generation and validation into the workflow.
+- Persists state across sessions.
 
-Running the AIEOS process manually requires knowing the correct artifact sequence, providing the right inputs to each generation prompt, tracking freeze states, and maintaining consistency across artifacts. This is error-prone — the console itself was built to prevent exactly these kinds of process errors.
-
-**aieos-console** addresses this by:
-- Sequencing artifacts automatically from kit flow definitions
-- Enforcing dependency gates (upstream artifacts must be frozen before downstream generation)
-- Integrating LLM generation and validation directly into the workflow
-- Persisting state so work survives across sessions
-
----
-
-## Who This Is For
-
-- Teams using AIEOS for software delivery governance
-- Individual practitioners running AIEOS processes on their own projects
-- Anyone evaluating the AIEOS framework who wants a guided experience
-
-You do **not** need deep AIEOS expertise to use the console — the wizard guides you through each step.
-
----
+You don't need deep AIEOS expertise: the wizard guides you through each step.
 
 ## Architecture
 
 - **Next.js 15** (App Router, TypeScript strict mode)
-- **7 core services:** Kit, Flow Definition, State, Filesystem, LLM, Orchestration, Logging
-- **Spec-driven flow engine** — kit directories provide YAML flow definitions that declare artifact sequences, step types, dependencies, and freeze gates
-- **Docker deployment** — multi-stage build, non-root user, health check endpoint
-- **Single-user local tool** — no authentication, no shared infrastructure
+- **7 core services:** Kit, Flow Definition, State, Filesystem, LLM, Orchestration, Logging.
+- **Spec-driven flow engine** - kit directories provide YAML flow definitions that declare artifact sequences, step types, dependencies, and freeze gates.
+- **Docker deployment** - multi-stage build, non-root user, health check endpoint.
+- **Single-user local tool** - no authentication, no shared infrastructure.
 
----
-
-## Quick Start
+## Getting started
 
 ### Prerequisites
 
@@ -80,7 +62,7 @@ docker run -d \
 
 Then open [http://localhost:3000](http://localhost:3000).
 
-### Environment Variables
+### Environment variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
@@ -90,8 +72,6 @@ Then open [http://localhost:3000](http://localhost:3000).
 | `LLM_API_KEY` | Yes | API key for the LLM provider |
 | `LLM_MODEL` | Yes | Model identifier (e.g., `claude-sonnet-4-20250514`) |
 | `PORT` | No | Server port (default: `3000`) |
-
----
 
 ## Development
 
@@ -104,24 +84,20 @@ npx tsc --noEmit                    # Type check
 npx eslint . --max-warnings 0      # Lint
 ```
 
-### Docker Verification
+### Docker verification
 
 ```bash
 scripts/verify-docker.sh            # Build, start, health check, init, persistence
 ```
 
----
+## Tests
 
-## Test Coverage
-
-- **241 unit/component tests** covering all 7 services and 11 UI components
-- **18 E2E tests** covering health check, project initialization, flow lifecycle, content editing, and error handling
+- 241 unit and component tests covering all 7 services and 11 UI components
+- 18 E2E tests covering health check, project initialization, flow lifecycle, content editing, and error handling
 - TypeScript strict mode with zero errors
 - ESLint with zero warnings
 
----
-
-## SDLC Documentation
+## SDLC governance
 
 This project was built using the full AIEOS process. All governance artifacts are in `docs/sdlc/`:
 
@@ -133,22 +109,16 @@ This project was built using the full AIEOS process. All governance artifacts ar
 
 The engagement record tracking all artifacts across layers is at `docs/engagement/er-CONSOLE-001.md`.
 
----
+## Related repositories
 
-## Related Repositories
-
-- [aieos-governance-foundation](https://github.com/wtlinnertz/aieos-governance-foundation) — Canonical authority for all structural rules and the layer model
-- [aieos-product-intelligence-kit](https://github.com/wtlinnertz/aieos-product-intelligence-kit) — Layer 2: Product discovery through engineered PRD
-- [aieos-engineering-execution-kit](https://github.com/wtlinnertz/aieos-engineering-execution-kit) — Layer 4: Design through deployable code
-- [aieos-release-exposure-kit](https://github.com/wtlinnertz/aieos-release-exposure-kit) — Layer 5: Safe deployment to production
-
----
+- [aieos-governance-foundation](https://github.com/wtlinnertz/aieos-governance-foundation): Canonical authority for all structural rules and the layer model
+- [aieos-product-intelligence-kit](https://github.com/wtlinnertz/aieos-product-intelligence-kit): Layer 2: Product discovery through engineered PRD
+- [aieos-engineering-execution-kit](https://github.com/wtlinnertz/aieos-engineering-execution-kit): Layer 4: Design through deployable code
+- [aieos-release-exposure-kit](https://github.com/wtlinnertz/aieos-release-exposure-kit): Layer 5: Safe deployment to production
 
 ## Contributing
 
 Contributions are welcome. Please read `CONTRIBUTING.md` before submitting a PR.
-
----
 
 ## License
 
