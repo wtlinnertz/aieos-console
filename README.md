@@ -14,6 +14,24 @@ It provides:
 
 This is the first application built using the AIEOS framework and validates the framework itself as both a product and a governance tool.
 
+## Kit coverage
+
+| Kit | Layer | Console support |
+|-----|-------|----------------|
+| PIK | 2 | Complete |
+| EEK | 4 | Complete |
+| REK | 5 | Complete |
+| RRK | 6 | In progress |
+| QAK | 9 | Not yet — planned post-M3 |
+| SCK | 10 | Not yet — planned post-M3 |
+| DCK | 11 | Not yet — planned post-M3 |
+| PINFK | 12 | Not yet — planned post-M3 |
+| DKK | 13 | Not yet — planned post-M3 |
+| PRK | 14 | Not yet — planned post-M3 |
+| BPK | 15 | Not yet — planned post-M3 |
+
+For kits without console support, run kit playbooks manually using `docs/how-to-use-with-ai.md` in the respective kit.
+
 ## What it solves
 
 Running AIEOS manually means tracking artifact sequences by hand, providing the right inputs to each generation prompt, managing freeze states, and keeping artifacts consistent. That's error-prone. The console automates it:
