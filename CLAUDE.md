@@ -67,5 +67,5 @@ Follow conventional commits: `docs: <description>`
 
 - [aieos-governance-foundation](https://github.com/wtlinnertz/aieos-governance-foundation) — Canonical authority for all structural rules
 - [aieos-product-intelligence-kit](https://github.com/wtlinnertz/aieos-product-intelligence-kit) — Layer 2
-- [aieos-engineering-execution-kit](https://github.com/wtlinnertz/aieos-engineering-execution-kit) — Layer 4
+- [aieos-engineering-execution](https://github.com/wtlinnertz/aieos-engineering-execution) — Layer 4
 - [aieos-release-exposure-kit](https://github.com/wtlinnertz/aieos-release-exposure-kit) — Layer 5
