@@ -49,6 +49,8 @@ function makeMockFs(
     createDirectory: vi.fn(),
     acquireLock: vi.fn(),
     releaseLock: vi.fn(),
+    readLock: vi.fn(),
+    renewLock: vi.fn(),
   };
 }
 
