@@ -54,8 +54,10 @@ function createStatefulMockFs(initialState: ProjectState): IFilesystemService {
     readDirectory: vi.fn().mockResolvedValue([]),
     exists: vi.fn().mockResolvedValue(false),
     createDirectory: vi.fn().mockResolvedValue(undefined),
-    acquireLock: vi.fn().mockResolvedValue({ acquired: true }),
-    releaseLock: vi.fn().mockResolvedValue(undefined),
+    acquireLock: vi.fn().mockResolvedValue({ acquired: true, tookOver: false }),
+    releaseLock: vi.fn().mockResolvedValue(true),
+    readLock: vi.fn().mockResolvedValue(null),
+    renewLock: vi.fn().mockResolvedValue(true),
   };
 }
 
