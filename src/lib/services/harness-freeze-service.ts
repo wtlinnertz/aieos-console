@@ -1,0 +1,163 @@
+import { execFile } from 'node:child_process';
+import * as crypto from 'node:crypto';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
+
+/**
+ * HarnessFreezeService — the console's freeze seam (ADR-0003).
+ *
+ * FR-020 makes the console a thin front-end that FREEZES THROUGH THE HARNESS
+ * rather than writing freeze status in its own shape. This service assembles a
+ * FreezeGateDecision and shells out to the harness `freeze` subcommand — the
+ * single authority that writes FROZEN (ADR-0002). The console never writes
+ * FROZEN itself, which is what closes the FR-018 freeze-format divergence.
+ *
+ * Two ADR-0003 hazards handled here:
+ *  - Argument injection: the harness is invoked with an explicit argv array via
+ *    execFile (never a shell string), so user-influenced values are never
+ *    interpreted by a shell.
+ *  - Decision integrity: the content hash is computed over the artifact the
+ *    human was SHOWN (passed in), not re-read at call time, so a freeze against
+ *    an artifact that changed under the human is rejected by the harness.
+ */
+
+export type FreezeOutcome =
+  | 'APPROVE'
+  | 'APPROVE_WITH_CONDITIONS'
+  | 'BLOCK'
+  | 'REMEDIATE_AND_RETRY'
+  | 'REQUIRE_REDESIGN';
+
+export interface FreezeRequest {
+  artifactId: string;
+  outcome: FreezeOutcome;
+  /** The exact artifact content shown to the human (hashed for integrity). */
+  shownContent: string;
+  decidedBy: string;
+  conditions?: string[];
+  rationale?: string;
+}
+
+export interface FreezeSuccess {
+  status: 'frozen';
+  artifactId: string;
+  path: string;
+  frozenCount: number | null;
+  decidedBy: string;
+}
+
+export class HarnessFreezeError extends Error {
+  readonly code: string;
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = 'HarnessFreezeError';
+    this.code = code;
+  }
+}
+
+export interface RunnerResult {
+  stdout: string;
+  stderr: string;
+  code: number;
+}
+export type CommandRunner = (
+  file: string,
+  args: string[],
+  cwd?: string,
+) => Promise<RunnerResult>;
+
+const defaultRunner: CommandRunner = (file, args, cwd) =>
+  new Promise((resolve) => {
+    execFile(file, args, { cwd }, (err, stdout, stderr) => {
+      const code = err && typeof err.code === 'number' ? err.code : err ? 1 : 0;
+      resolve({ stdout: stdout ?? '', stderr: stderr ?? '', code });
+    });
+  });
+
+export function hashArtifact(content: string): string {
+  return crypto.createHash('sha256').update(content, 'utf-8').digest('hex');
+}
+
+export class HarnessFreezeService {
+  private readonly file: string;
+  private readonly baseArgs: string[];
+  private readonly cwd?: string;
+  private readonly runner: CommandRunner;
+
+  /** harnessCmd e.g. ["harness"] or ["python", "-m", "src.cli"]. */
+  constructor(
+    harnessCmd: string[],
+    opts?: { cwd?: string; runner?: CommandRunner },
+  ) {
+    if (harnessCmd.length === 0) {
+      throw new Error('harnessCmd must not be empty');
+    }
+    this.file = harnessCmd[0];
+    this.baseArgs = harnessCmd.slice(1);
+    this.cwd = opts?.cwd;
+    this.runner = opts?.runner ?? defaultRunner;
+  }
+
+  async freeze(
+    initiativeDir: string,
+    request: FreezeRequest,
+  ): Promise<FreezeSuccess> {
+    const decision = {
+      artifact_id: request.artifactId,
+      outcome: request.outcome,
+      content_hash: hashArtifact(request.shownContent),
+      decided_by: request.decidedBy,
+      conditions: request.conditions ?? [],
+      rationale: request.rationale ?? '',
+    };
+
+    const decisionPath = path.join(
+      os.tmpdir(),
+      `aieos-freeze-${crypto.randomBytes(8).toString('hex')}.json`,
+    );
+    await fs.writeFile(decisionPath, JSON.stringify(decision), 'utf-8');
+
+    try {
+      const args = [
+        ...this.baseArgs,
+        'freeze',
+        '--initiative', initiativeDir,
+        '--artifact', request.artifactId,
+        '--decision', decisionPath,
+        '--decided-by', request.decidedBy,
+      ];
+      const { stdout, stderr, code } = await this.runner(this.file, args, this.cwd);
+
+      if (code !== 0) {
+        let err: { error?: string; message?: string } = {};
+        try {
+          err = JSON.parse(stderr || '{}');
+        } catch {
+          err = { error: 'harness_failed', message: (stderr || '').trim() };
+        }
+        throw new HarnessFreezeError(
+          err.error ?? 'harness_failed',
+          err.message ?? `harness freeze exited ${code}`,
+        );
+      }
+
+      const parsed = JSON.parse(stdout) as {
+        status: string;
+        artifact_id: string;
+        path: string;
+        frozen_count: number | null;
+        decided_by: string;
+      };
+      return {
+        status: 'frozen',
+        artifactId: parsed.artifact_id,
+        path: parsed.path,
+        frozenCount: parsed.frozen_count,
+        decidedBy: parsed.decided_by,
+      };
+    } finally {
+      await fs.rm(decisionPath, { force: true });
+    }
+  }
+}
