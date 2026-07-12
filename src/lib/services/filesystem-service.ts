@@ -21,16 +21,54 @@ export interface DirectoryEntry {
   type: 'file' | 'directory';
 }
 
+export type LockDriver = 'console' | 'dark-factory' | 'sherpa';
+
+export const LOCK_VERSION = '1.0';
+export const DEFAULT_LEASE_TTL_SECONDS = 300; // 5 min (FR-019 Q4)
+export const DEFAULT_HEARTBEAT_SECONDS = 60; // 60 s (FR-019 Q4)
+
+/**
+ * The on-disk `.aieos/lock` record. Field names are snake_case because this is
+ * the SAME wire format the Python harness (src/lock.py) reads and writes —
+ * FR-019's whole point is one lock all drivers honor. See
+ * aieos-schema/schema/lock.yaml.
+ */
 export interface LockInfo {
-  pid: number;
-  timestamp: string;
+  lock_version: string;
+  initiative: string;
+  owner: string;
+  driver: LockDriver;
+  session_id: string;
   hostname: string;
+  pid: number;
+  acquired_at: string;
+  renewed_at: string;
+  lease_ttl_seconds: number;
+  heartbeat_interval_seconds: number;
 }
 
 export interface LockResult {
   acquired: boolean;
-  existingLock?: LockInfo;
+  tookOver: boolean;
+  info?: LockInfo;
+  previous?: LockInfo;
 }
+
+export interface AcquireLockOptions {
+  owner: string;
+  driver: LockDriver;
+  sessionId?: string;
+  initiative?: string;
+  leaseTtlSeconds?: number;
+  heartbeatIntervalSeconds?: number;
+  // Dependency-injection seams (also used by tests):
+  now?: Date;
+  hostname?: string;
+  pid?: number;
+  pidIsAlive?: (pid: number) => boolean;
+}
+
+const VALID_DRIVERS: readonly LockDriver[] = ['console', 'dark-factory', 'sherpa'];
 
 export interface IFilesystemService {
   readFile(filePath: string): Promise<FileResult>;
@@ -38,8 +76,10 @@ export interface IFilesystemService {
   readDirectory(dirPath: string): Promise<DirectoryEntry[]>;
   exists(targetPath: string): Promise<boolean>;
   createDirectory(dirPath: string): Promise<void>;
-  acquireLock(projectDir: string): Promise<LockResult>;
-  releaseLock(projectDir: string): Promise<void>;
+  readLock(projectDir: string): Promise<LockInfo | null>;
+  acquireLock(projectDir: string, options: AcquireLockOptions): Promise<LockResult>;
+  renewLock(projectDir: string, sessionId: string, now?: Date): Promise<boolean>;
+  releaseLock(projectDir: string, sessionId: string): Promise<boolean>;
 }
 
 interface FilesystemServiceConfig {
@@ -71,8 +111,6 @@ export class FilesystemService implements IFilesystemService {
     try {
       realPath = await fs.realpath(resolved);
     } catch {
-      // If the file doesn't exist yet, realpath fails.
-      // In that case, check the parent directory's realpath.
       const parentDir = path.dirname(resolved);
       try {
         const realParent = await fs.realpath(parentDir);
@@ -87,8 +125,6 @@ export class FilesystemService implements IFilesystemService {
         if (parentErr instanceof PathViolationError) {
           throw parentErr;
         }
-        // Parent doesn't exist either — return the resolved path
-        // and let the caller handle ENOENT
         return resolved;
       }
     }
@@ -138,7 +174,6 @@ export class FilesystemService implements IFilesystemService {
       await fs.writeFile(tempPath, content, 'utf-8');
       await fs.rename(tempPath, validated);
     } catch (err: unknown) {
-      // Clean up temp file on any failure
       try {
         await fs.unlink(tempPath);
       } catch {
@@ -189,66 +224,176 @@ export class FilesystemService implements IFilesystemService {
     }
   }
 
-  async acquireLock(projectDir: string): Promise<LockResult> {
-    const aieosDir = path.join(projectDir, '.aieos');
-    const lockPath = path.join(aieosDir, 'lock');
+  // ---------------------------------------------------------------------------
+  // Cross-driver initiative lock (FR-019)
+  //
+  // A rewrite of the original .aieos/lock, not an extension (ADR-0002
+  // amendment). Hostname-aware liveness + a heartbeat lease, so a crashed
+  // unattended run frees itself within lease_ttl_seconds instead of wedging the
+  // initiative, and a lock from another host is never judged by a local PID.
+  // session_id is the ownership token. Byte-compatible with the Python harness
+  // (src/lock.py) and aieos-schema/schema/lock.yaml.
+  // ---------------------------------------------------------------------------
 
-    await fs.mkdir(aieosDir, { recursive: true });
-
-    try {
-      const lockContent = await fs.readFile(lockPath, 'utf-8');
-      const lockInfo: LockInfo = JSON.parse(lockContent);
-
-      if (this.isPidAlive(lockInfo.pid)) {
-        return { acquired: false, existingLock: lockInfo };
-      }
-
-      // Stale lock — remove and acquire
-      await fs.unlink(lockPath);
-    } catch (err: unknown) {
-      const nodeErr = err as NodeJS.ErrnoException;
-      if (nodeErr.code !== 'ENOENT') {
-        throw new WriteError(`Failed to check lock file: ${lockPath}`);
-      }
-      // No lock file exists — proceed to acquire
-    }
-
-    const newLock: LockInfo = {
-      pid: process.pid,
-      timestamp: new Date().toISOString(),
-      hostname: os.hostname(),
-    };
-
-    await fs.writeFile(lockPath, JSON.stringify(newLock), 'utf-8');
-    return { acquired: true };
+  private lockFilePath(projectDir: string): string {
+    return path.join(projectDir, '.aieos', 'lock');
   }
 
-  async releaseLock(projectDir: string): Promise<void> {
-    const lockPath = path.join(projectDir, '.aieos', 'lock');
-
-    try {
-      const lockContent = await fs.readFile(lockPath, 'utf-8');
-      const lockInfo: LockInfo = JSON.parse(lockContent);
-
-      // Only release if we own the lock
-      if (lockInfo.pid === process.pid) {
-        await fs.unlink(lockPath);
-      }
-    } catch (err: unknown) {
-      const nodeErr = err as NodeJS.ErrnoException;
-      if (nodeErr.code === 'ENOENT') {
-        return; // No lock file — nothing to release
-      }
-      throw new WriteError(`Failed to release lock: ${lockPath}`);
-    }
+  private haltFilePath(projectDir: string): string {
+    return path.join(projectDir, '.aieos', 'halt');
   }
 
-  private isPidAlive(pid: number): boolean {
+  /** ISO 8601 UTC with no fractional seconds — matches the Python writer. */
+  private nowIso(now?: Date): string {
+    return (now ?? new Date()).toISOString().replace(/\.\d{3}Z$/, 'Z');
+  }
+
+  /** Whether a process exists on THIS host. Advisory, hostname-scoped only. */
+  private pidAlive(pid: number): boolean {
+    if (pid <= 0) return false;
     try {
       process.kill(pid, 0);
       return true;
-    } catch {
-      return false;
+    } catch (err) {
+      const e = err as NodeJS.ErrnoException;
+      // EPERM: the process exists but is owned by another user — still alive.
+      return e.code === 'EPERM';
     }
+  }
+
+  async readLock(projectDir: string): Promise<LockInfo | null> {
+    const lockPath = this.lockFilePath(projectDir);
+    try {
+      const content = await fs.readFile(lockPath, 'utf-8');
+      return JSON.parse(content) as LockInfo;
+    } catch (err: unknown) {
+      const nodeErr = err as NodeJS.ErrnoException;
+      if (nodeErr.code === 'ENOENT') return null;
+      throw new WriteError(`Failed to read lock file: ${lockPath}`);
+    }
+  }
+
+  private isTakeable(
+    info: LockInfo,
+    now: Date,
+    thisHost: string,
+    pidAlive: (pid: number) => boolean,
+  ): boolean {
+    const ageSec = (now.getTime() - Date.parse(info.renewed_at)) / 1000;
+    if (ageSec > info.lease_ttl_seconds) return true;
+    if (info.hostname === thisHost && !pidAlive(info.pid)) return true;
+    return false;
+  }
+
+  private async writeHaltSentinel(
+    projectDir: string,
+    previous: LockInfo,
+    taker: LockInfo,
+    atIso: string,
+  ): Promise<void> {
+    const payload = {
+      reason: 'stale_lock_takeover',
+      at: atIso,
+      taken_from: {
+        owner: previous.owner,
+        driver: previous.driver,
+        session_id: previous.session_id,
+        hostname: previous.hostname,
+        pid: previous.pid,
+      },
+      taken_by: {
+        owner: taker.owner,
+        driver: taker.driver,
+        session_id: taker.session_id,
+        hostname: taker.hostname,
+      },
+    };
+    const haltPath = this.haltFilePath(projectDir);
+    await fs.mkdir(path.dirname(haltPath), { recursive: true });
+    await fs.writeFile(haltPath, JSON.stringify(payload, null, 2), 'utf-8');
+  }
+
+  async acquireLock(
+    projectDir: string,
+    options: AcquireLockOptions,
+  ): Promise<LockResult> {
+    if (!VALID_DRIVERS.includes(options.driver)) {
+      throw new Error(
+        `Unknown driver '${options.driver}'; expected one of ${VALID_DRIVERS.join(', ')}`,
+      );
+    }
+
+    const aieosDir = path.join(projectDir, '.aieos');
+    await fs.mkdir(aieosDir, { recursive: true });
+
+    const now = options.now ?? new Date();
+    const thisHost = options.hostname ?? os.hostname();
+    const thisPid = options.pid ?? process.pid;
+    const sid = options.sessionId ?? crypto.randomUUID();
+    const pidAlive = options.pidIsAlive ?? ((p: number) => this.pidAlive(p));
+    const lockPath = this.lockFilePath(projectDir);
+
+    const existing = await this.readLock(projectDir);
+
+    if (existing && existing.session_id === sid) {
+      existing.renewed_at = this.nowIso(now);
+      await fs.writeFile(lockPath, JSON.stringify(existing, null, 2), 'utf-8');
+      return { acquired: true, tookOver: false, info: existing };
+    }
+
+    if (existing && !this.isTakeable(existing, now, thisHost, pidAlive)) {
+      return { acquired: false, tookOver: false, info: existing };
+    }
+
+    const ours: LockInfo = {
+      lock_version: LOCK_VERSION,
+      initiative: options.initiative ?? '',
+      owner: options.owner,
+      driver: options.driver,
+      session_id: sid,
+      hostname: thisHost,
+      pid: thisPid,
+      acquired_at: this.nowIso(now),
+      renewed_at: this.nowIso(now),
+      lease_ttl_seconds: options.leaseTtlSeconds ?? DEFAULT_LEASE_TTL_SECONDS,
+      heartbeat_interval_seconds:
+        options.heartbeatIntervalSeconds ?? DEFAULT_HEARTBEAT_SECONDS,
+    };
+
+    const tookOver = existing !== null;
+    if (tookOver && existing) {
+      await this.writeHaltSentinel(projectDir, existing, ours, this.nowIso(now));
+    }
+
+    await fs.writeFile(lockPath, JSON.stringify(ours, null, 2), 'utf-8');
+    return {
+      acquired: true,
+      tookOver,
+      info: ours,
+      previous: tookOver && existing ? existing : undefined,
+    };
+  }
+
+  async renewLock(
+    projectDir: string,
+    sessionId: string,
+    now?: Date,
+  ): Promise<boolean> {
+    const existing = await this.readLock(projectDir);
+    if (!existing || existing.session_id !== sessionId) return false;
+    existing.renewed_at = this.nowIso(now);
+    await fs.writeFile(
+      this.lockFilePath(projectDir),
+      JSON.stringify(existing, null, 2),
+      'utf-8',
+    );
+    return true;
+  }
+
+  async releaseLock(projectDir: string, sessionId: string): Promise<boolean> {
+    const existing = await this.readLock(projectDir);
+    if (!existing || existing.session_id !== sessionId) return false;
+    await fs.unlink(this.lockFilePath(projectDir));
+    return true;
   }
 }

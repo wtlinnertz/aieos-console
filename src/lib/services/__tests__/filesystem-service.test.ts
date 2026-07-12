@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { FilesystemService } from '../filesystem-service.js';
+import { FilesystemService, DEFAULT_LEASE_TTL_SECONDS } from '../filesystem-service.js';
 import {
   PathViolationError,
   FileNotFoundError,
@@ -195,110 +195,200 @@ describe('FilesystemService', () => {
     });
   });
 
-  describe('acquireLock', () => {
-    it('AT-3: acquires lock when no lock file exists', async () => {
-      const result = await service.acquireLock(tmpDir);
+  const LOCK_HOST = 'host-A';
+  const T0 = new Date('2026-07-12T10:00:00Z');
+  const deadPid = () => false;
+  const alivePid = () => true;
+  const later = (seconds: number) => new Date(T0.getTime() + seconds * 1000);
+  const lockBase = {
+    owner: 'todd',
+    driver: 'dark-factory' as const,
+    now: T0,
+    hostname: LOCK_HOST,
+    pid: 4242,
+    pidIsAlive: alivePid,
+  };
 
-      expect(result.acquired).toBe(true);
-      expect(result.existingLock).toBeUndefined();
+  describe('cross-driver lock (FR-019): acquire fresh', () => {
+    it('acquires on an unlocked initiative and writes the canonical record', async () => {
+      const r = await service.acquireLock(tmpDir, { ...lockBase, sessionId: 's1' });
+      expect(r.acquired).toBe(true);
+      expect(r.tookOver).toBe(false);
+      expect(r.info?.session_id).toBe('s1');
 
-      // Verify lock file was created
-      const lockPath = path.join(tmpDir, '.aieos', 'lock');
-      const lockContent = JSON.parse(await fs.readFile(lockPath, 'utf-8'));
-      expect(lockContent.pid).toBe(process.pid);
-      expect(lockContent.hostname).toBe(os.hostname());
-      expect(new Date(lockContent.timestamp).toISOString()).toBe(
-        lockContent.timestamp,
+      const onDisk = JSON.parse(
+        await fs.readFile(path.join(tmpDir, '.aieos', 'lock'), 'utf-8'),
       );
+      expect(onDisk.owner).toBe('todd');
+      expect(onDisk.hostname).toBe(LOCK_HOST);
+      expect(onDisk.lease_ttl_seconds).toBe(DEFAULT_LEASE_TTL_SECONDS);
+      expect(onDisk.acquired_at).toBe('2026-07-12T10:00:00Z');
+      expect(onDisk.lock_version).toBe('1.0');
     });
 
-    it('AT-3: removes stale lock (dead PID) and acquires', async () => {
-      const aieosDir = path.join(tmpDir, '.aieos');
-      await fs.mkdir(aieosDir, { recursive: true });
-
-      const staleLock = {
-        pid: 999999, // Very unlikely to be a live process
-        timestamp: new Date().toISOString(),
-        hostname: os.hostname(),
-      };
-      await fs.writeFile(
-        path.join(aieosDir, 'lock'),
-        JSON.stringify(staleLock),
-      );
-
-      const result = await service.acquireLock(tmpDir);
-
-      expect(result.acquired).toBe(true);
-      const lockContent = JSON.parse(
-        await fs.readFile(path.join(aieosDir, 'lock'), 'utf-8'),
-      );
-      expect(lockContent.pid).toBe(process.pid);
+    it('generates a session_id when none is supplied', async () => {
+      const r = await service.acquireLock(tmpDir, lockBase);
+      expect(r.info?.session_id).toBeTruthy();
     });
 
-    it('AT-3: returns acquired:false for live PID lock', async () => {
-      const aieosDir = path.join(tmpDir, '.aieos');
-      await fs.mkdir(aieosDir, { recursive: true });
-
-      const liveLock = {
-        pid: process.pid, // Current process is alive
-        timestamp: new Date().toISOString(),
-        hostname: os.hostname(),
-      };
-      await fs.writeFile(
-        path.join(aieosDir, 'lock'),
-        JSON.stringify(liveLock),
-      );
-
-      const result = await service.acquireLock(tmpDir);
-
-      expect(result.acquired).toBe(false);
-      expect(result.existingLock).toBeDefined();
-      expect(result.existingLock!.pid).toBe(process.pid);
+    it('rejects an unknown driver', async () => {
+      await expect(
+        // @ts-expect-error intentional bad driver
+        service.acquireLock(tmpDir, { ...lockBase, driver: 'wizard' }),
+      ).rejects.toThrow(/Unknown driver/);
     });
 
-    it('creates .aieos directory if it does not exist', async () => {
-      await service.acquireLock(tmpDir);
-
-      const aieosDir = path.join(tmpDir, '.aieos');
-      const stat = await fs.stat(aieosDir);
+    it('creates the .aieos directory if it does not exist', async () => {
+      await service.acquireLock(tmpDir, lockBase);
+      const stat = await fs.stat(path.join(tmpDir, '.aieos'));
       expect(stat.isDirectory()).toBe(true);
     });
   });
 
-  describe('releaseLock', () => {
-    it('removes lock file owned by current process', async () => {
-      await service.acquireLock(tmpDir);
-
-      await service.releaseLock(tmpDir);
-
-      const lockPath = path.join(tmpDir, '.aieos', 'lock');
-      await expect(fs.access(lockPath)).rejects.toThrow();
+  describe('cross-driver lock (FR-019): contended', () => {
+    it('is blocked by a live, unexpired lock from another session', async () => {
+      await service.acquireLock(tmpDir, { ...lockBase, sessionId: 's1' });
+      const r = await service.acquireLock(tmpDir, {
+        ...lockBase,
+        sessionId: 's2',
+        now: later(10),
+      });
+      expect(r.acquired).toBe(false);
+      expect(r.info?.session_id).toBe('s1');
+      await expect(
+        fs.access(path.join(tmpDir, '.aieos', 'halt')),
+      ).rejects.toThrow();
     });
 
-    it('does not remove lock file owned by another process', async () => {
+    it('re-acquiring our own session refreshes the heartbeat', async () => {
+      await service.acquireLock(tmpDir, { ...lockBase, sessionId: 's1' });
+      const r = await service.acquireLock(tmpDir, {
+        ...lockBase,
+        sessionId: 's1',
+        now: later(30),
+      });
+      expect(r.acquired).toBe(true);
+      expect(r.tookOver).toBe(false);
+      expect((await service.readLock(tmpDir))?.renewed_at).toBe(
+        '2026-07-12T10:00:30Z',
+      );
+    });
+  });
+
+  describe('cross-driver lock (FR-019): takeover', () => {
+    it('takes over an expired lease and writes the halt sentinel', async () => {
+      await service.acquireLock(tmpDir, { ...lockBase, sessionId: 's1' });
+      const r = await service.acquireLock(tmpDir, {
+        ...lockBase,
+        sessionId: 's2',
+        now: later(DEFAULT_LEASE_TTL_SECONDS + 1),
+      });
+      expect(r.acquired).toBe(true);
+      expect(r.tookOver).toBe(true);
+      expect(r.previous?.session_id).toBe('s1');
+
+      const halt = JSON.parse(
+        await fs.readFile(path.join(tmpDir, '.aieos', 'halt'), 'utf-8'),
+      );
+      expect(halt.reason).toBe('stale_lock_takeover');
+      expect(halt.taken_from.session_id).toBe('s1');
+      expect(halt.taken_by.session_id).toBe('s2');
+    });
+
+    it('takes over a same-host dead-PID lock before the lease expires', async () => {
+      await service.acquireLock(tmpDir, { ...lockBase, sessionId: 's1', pid: 4242 });
+      const r = await service.acquireLock(tmpDir, {
+        ...lockBase,
+        sessionId: 's2',
+        now: later(10),
+        pidIsAlive: deadPid,
+      });
+      expect(r.acquired).toBe(true);
+      expect(r.tookOver).toBe(true);
+    });
+
+    it('does not take over a cross-host lock within its lease', async () => {
+      await service.acquireLock(tmpDir, {
+        ...lockBase,
+        sessionId: 's1',
+        hostname: 'host-A',
+        pid: 4242,
+      });
+      const r = await service.acquireLock(tmpDir, {
+        owner: 'ci',
+        driver: 'console',
+        sessionId: 's2',
+        now: later(10),
+        hostname: 'host-B',
+        pid: 99,
+        pidIsAlive: deadPid,
+      });
+      expect(r.acquired).toBe(false);
+      expect(r.info?.session_id).toBe('s1');
+    });
+  });
+
+  describe('cross-driver lock (FR-019): renew', () => {
+    it('renews our own lock', async () => {
+      await service.acquireLock(tmpDir, { ...lockBase, sessionId: 's1' });
+      expect(await service.renewLock(tmpDir, 's1', later(60))).toBe(true);
+      expect((await service.readLock(tmpDir))?.renewed_at).toBe(
+        '2026-07-12T10:01:00Z',
+      );
+    });
+
+    it('fails to renew a foreign session', async () => {
+      await service.acquireLock(tmpDir, { ...lockBase, sessionId: 's1' });
+      expect(await service.renewLock(tmpDir, 'other')).toBe(false);
+    });
+
+    it('fails to renew when there is no lock', async () => {
+      expect(await service.renewLock(tmpDir, 's1')).toBe(false);
+    });
+  });
+
+  describe('cross-driver lock (FR-019): release', () => {
+    it('releases a lock we own', async () => {
+      await service.acquireLock(tmpDir, { ...lockBase, sessionId: 's1' });
+      expect(await service.releaseLock(tmpDir, 's1')).toBe(true);
+      expect(await service.readLock(tmpDir)).toBeNull();
+    });
+
+    it('does not release a lock owned by another session', async () => {
+      await service.acquireLock(tmpDir, { ...lockBase, sessionId: 's1' });
+      expect(await service.releaseLock(tmpDir, 'other')).toBe(false);
+      expect((await service.readLock(tmpDir))?.session_id).toBe('s1');
+    });
+
+    it('is a no-op when there is no lock', async () => {
+      expect(await service.releaseLock(tmpDir, 's1')).toBe(false);
+    });
+  });
+
+  describe('cross-driver lock (FR-019): wire compatibility', () => {
+    it('reads a Python-written (snake_case, no-millis) lock record', async () => {
       const aieosDir = path.join(tmpDir, '.aieos');
       await fs.mkdir(aieosDir, { recursive: true });
-
-      const otherLock = {
-        pid: 999998,
-        timestamp: new Date().toISOString(),
-        hostname: os.hostname(),
+      const pythonRecord = {
+        owner: 'todd',
+        driver: 'dark-factory',
+        session_id: 'py-1',
+        hostname: LOCK_HOST,
+        pid: 1,
+        acquired_at: '2026-07-12T10:00:00Z',
+        renewed_at: '2026-07-12T10:00:00Z',
+        initiative: 'INIT-S-005',
+        lease_ttl_seconds: 300,
+        heartbeat_interval_seconds: 60,
+        lock_version: '1.0',
       };
-      const lockPath = path.join(aieosDir, 'lock');
-      await fs.writeFile(lockPath, JSON.stringify(otherLock));
-
-      await service.releaseLock(tmpDir);
-
-      // Lock file should still exist
-      const content = await fs.readFile(lockPath, 'utf-8');
-      expect(JSON.parse(content).pid).toBe(999998);
-    });
-
-    it('no-op when no lock file exists', async () => {
-      await fs.mkdir(path.join(tmpDir, '.aieos'), { recursive: true });
-
-      // Should not throw
-      await service.releaseLock(tmpDir);
+      await fs.writeFile(
+        path.join(aieosDir, 'lock'),
+        JSON.stringify(pythonRecord, null, 2),
+      );
+      const info = await service.readLock(tmpDir);
+      expect(info?.session_id).toBe('py-1');
+      expect(info?.lease_ttl_seconds).toBe(300);
     });
   });
 
