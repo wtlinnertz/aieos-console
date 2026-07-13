@@ -4,6 +4,7 @@ import * as os from 'node:os';
 
 const testProjectDir = path.join(os.tmpdir(), 'aieos-e2e-project');
 const testKitDir = path.resolve('./e2e/fixtures/test-kit');
+const fakeHarness = path.resolve('./e2e/fixtures/fake-harness.mjs');
 
 export default defineConfig({
   testDir: './e2e',
@@ -26,6 +27,7 @@ export default defineConfig({
       LLM_PROVIDER: 'mock',
       LLM_API_KEY: 'test-key',
       LLM_MODEL: 'mock-model',
+      HARNESS_CMD: `node ${fakeHarness}`,
     },
   },
 });

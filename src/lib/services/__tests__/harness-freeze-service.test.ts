@@ -97,3 +97,24 @@ describe('HarnessFreezeService', () => {
     expect(() => new HarnessFreezeService([])).toThrow();
   });
 });
+
+
+// Integration: the e2e fake harness fixture must honor the ADR-0003 contract,
+// so the console's freeze-through-harness path works in e2e/CI (real subprocess).
+import * as path from 'node:path';
+
+describe('HarnessFreezeService <-> e2e fake harness (real subprocess)', () => {
+  it('freezes successfully against e2e/fixtures/fake-harness.mjs', async () => {
+    const fake = path.resolve('e2e/fixtures/fake-harness.mjs');
+    const svc = new HarnessFreezeService(['node', fake]);
+    const res = await svc.freeze('/tmp/e2e-init', {
+      artifactId: 'PRD-E2E-001',
+      outcome: 'APPROVE',
+      shownContent: CONTENT,
+      decidedBy: 'console-user',
+    });
+    expect(res.status).toBe('frozen');
+    expect(res.artifactId).toBe('PRD-E2E-001');
+    expect(res.decidedBy).toBe('console-user');
+  });
+});
