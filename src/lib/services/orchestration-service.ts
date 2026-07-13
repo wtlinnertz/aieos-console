@@ -25,6 +25,7 @@ import {
   StepNotEditableError,
   StepNotFoundError,
 } from './errors.js';
+import type { HarnessFreezeService } from './harness-freeze-service.js';
 
 function defaultArtifactState(stepId: string, kitId: string): ArtifactState {
   return {
@@ -43,15 +44,18 @@ export class OrchestrationService implements IOrchestrationService {
   private readonly kitService: IKitService;
   private readonly stateService: IStateService;
   private readonly llmService: ILlmService;
+  private readonly freezeService: HarnessFreezeService | null;
 
   constructor(
     kitService: IKitService,
     stateService: IStateService,
     llmService: ILlmService,
+    freezeService: HarnessFreezeService | null = null,
   ) {
     this.kitService = kitService;
     this.stateService = stateService;
     this.llmService = llmService;
+    this.freezeService = freezeService;
   }
 
   async getFlowStatus(projectDir: string, kitId: string): Promise<FlowStatus> {
@@ -374,10 +378,6 @@ export class OrchestrationService implements IOrchestrationService {
     stepId: string,
     artifactId: string,
   ): Promise<void> {
-    const kitPath = await this.resolveKitPath(projectDir, kitId);
-    const kit = await this.kitService.loadKit(kitPath);
-    const step = this.findStep(kit.flow.steps, stepId);
-
     const currentState = await this.stateService.getArtifactState(
       projectDir,
       stepId,
@@ -389,21 +389,36 @@ export class OrchestrationService implements IOrchestrationService {
       );
     }
 
-    // Transition to frozen
+    // FR-020: the console freezes THROUGH the harness (the single FROZEN writer,
+    // ADR-0002/0003), not by writing freeze status in its own shape. It no longer
+    // writes the horizontal ER row -- `harness freeze` (apply_freeze_decision)
+    // updates the canonical Document Control block + ER state block + journal.
+    if (this.freezeService === null) {
+      throw new Error('Harness freeze service is not configured');
+    }
+    if (currentState.artifactPath === null) {
+      throw new Error(`Step "${stepId}" has no artifact to freeze`);
+    }
+    // Hash the artifact content shown to the human (decision integrity, ADR-0003).
+    // validated-pass artifacts are not editable, so the on-disk content is what
+    // was shown.
+    const shownContent = await this.stateService.readArtifact(
+      projectDir,
+      currentState.artifactPath,
+    );
+    await this.freezeService.freeze(projectDir, {
+      artifactId,
+      outcome: 'APPROVE',
+      shownContent,
+      decidedBy: 'console-user',
+    });
+
+    // Reflect the harness's canonical FROZEN write in the local cache.
     await this.stateService.updateArtifactState(projectDir, stepId, {
       status: 'frozen',
       artifactId,
       frozenAt: new Date().toISOString(),
     });
-
-    // Update engagement record
-    await this.stateService.updateEngagementRecord(
-      projectDir,
-      artifactId,
-      step.artifactType,
-      'frozen',
-      `Frozen at ${new Date().toISOString()}`,
-    );
   }
 
   async updateArtifactContent(

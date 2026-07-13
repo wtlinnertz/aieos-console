@@ -6,6 +6,7 @@ import { LlmService } from './llm-service';
 import { AnthropicProvider } from './anthropic-provider';
 import { MockLlmProvider } from './mock-provider';
 import { OrchestrationService } from './orchestration-service';
+import { HarnessFreezeService } from './harness-freeze-service';
 import type { IOrchestrationService } from './orchestration-types';
 import type { ILlmService } from './llm-types';
 import type { IFilesystemService } from './filesystem-service';
@@ -45,7 +46,11 @@ export function getServices(): Services {
     llm.registerProvider(new MockLlmProvider());
   }
 
-  const orchestration = new OrchestrationService(kit, state, llm);
+  const freeze = new HarnessFreezeService(
+    config.harnessCmd.split(' ').filter(Boolean),
+    { cwd: config.harnessCwd ?? undefined },
+  );
+  const orchestration = new OrchestrationService(kit, state, llm, freeze);
 
   instance = { filesystem, kit, state, llm, orchestration };
   return instance;
