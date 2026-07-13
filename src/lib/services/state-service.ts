@@ -47,6 +47,7 @@ export interface IStateService {
     content: string,
     filename: string,
   ): Promise<string>;
+  readArtifact(projectDir: string, relativePath: string): Promise<string>;
   recordLlmUsage(projectDir: string, record: LlmUsageRecord): Promise<void>;
   updateEngagementRecord(
     projectDir: string,
@@ -197,6 +198,12 @@ export class StateService implements IStateService {
     }
 
     return relativePath;
+  }
+
+  async readArtifact(projectDir: string, relativePath: string): Promise<string> {
+    const fullPath = path.join(projectDir, relativePath);
+    const result = await this.fs.readFile(fullPath);
+    return result.content;
   }
 
   async recordLlmUsage(

@@ -154,8 +154,21 @@ function makeMockStateService(
       },
     ),
     saveArtifact: vi.fn().mockResolvedValue('docs/sdlc/01-prd.md'),
+    readArtifact: vi.fn().mockResolvedValue('# PRD\n\nshown content\n'),
     recordLlmUsage: vi.fn().mockResolvedValue(undefined),
     updateEngagementRecord: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+function makeMockFreezeService() {
+  return {
+    freeze: vi.fn().mockResolvedValue({
+      status: 'frozen',
+      artifactId: 'PRD-TEST-001',
+      path: 'docs/sdlc/01-prd.md',
+      frozenCount: 1,
+      decidedBy: 'console-user',
+    }),
   };
 }
 
@@ -602,10 +615,12 @@ describe('OrchestrationService', () => {
           }),
         ]),
       );
+      const freezeService = makeMockFreezeService();
       const service = new OrchestrationService(
         makeMockKitService(kitResult),
         stateService,
         makeMockLlmService(),
+        freezeService as unknown as ConstructorParameters<typeof OrchestrationService>[3],
       );
 
       await service.freezeArtifact(
@@ -615,6 +630,15 @@ describe('OrchestrationService', () => {
         'PRD-TEST-001',
       );
 
+      // FR-020: freezes THROUGH the harness (single writer), not its own ER row.
+      expect(freezeService.freeze).toHaveBeenCalledWith(
+        projectDir,
+        expect.objectContaining({
+          artifactId: 'PRD-TEST-001',
+          outcome: 'APPROVE',
+          decidedBy: 'console-user',
+        }),
+      );
       expect(stateService.updateArtifactState).toHaveBeenCalledWith(
         projectDir,
         'step-1',
@@ -623,13 +647,7 @@ describe('OrchestrationService', () => {
           artifactId: 'PRD-TEST-001',
         }),
       );
-      expect(stateService.updateEngagementRecord).toHaveBeenCalledWith(
-        projectDir,
-        'PRD-TEST-001',
-        'prd',
-        'frozen',
-        expect.any(String),
-      );
+      expect(stateService.updateEngagementRecord).not.toHaveBeenCalled();
     });
 
     it('throws StepNotValidatedPassError when step is not validated-pass', async () => {

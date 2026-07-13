@@ -5,6 +5,8 @@ export interface AppConfig {
   llmProvider: string;
   llmModel: string;
   port: string;
+  harnessCmd: string;
+  harnessCwd: string | null;
 }
 
 export function loadConfig(): AppConfig {
@@ -15,6 +17,8 @@ export function loadConfig(): AppConfig {
   const llmProvider = process.env.LLM_PROVIDER ?? 'anthropic';
   const llmModel = process.env.LLM_MODEL ?? '';
   const port = process.env.PORT ?? '3000';
+  const harnessCmd = process.env.HARNESS_CMD ?? 'harness';
+  const harnessCwd = process.env.HARNESS_CWD ?? null;
 
   return {
     projectDir,
@@ -23,5 +27,7 @@ export function loadConfig(): AppConfig {
     llmProvider,
     llmModel,
     port,
+    harnessCmd,
+    harnessCwd,
   };
 }
