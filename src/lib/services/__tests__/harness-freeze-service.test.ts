@@ -17,7 +17,7 @@ function okRunner(capture: { file?: string; args?: string[]; decision?: unknown 
     capture.decision = JSON.parse(fs.readFileSync(dPath, 'utf-8'));
     return {
       stdout: JSON.stringify({
-        status: 'frozen',
+        status: 'FROZEN',
         artifact_id: 'PRD-DEMO-001',
         path: '/i/docs/sdlc/prd.md',
         frozen_count: 3,
@@ -29,6 +29,54 @@ function okRunner(capture: { file?: string; args?: string[]; decision?: unknown 
   };
 }
 
+describe('HarnessFreezeService canonical status (G-14)', () => {
+  const req = {
+    artifactId: 'PRD-DEMO-001',
+    outcome: 'APPROVE' as const,
+    shownContent: CONTENT,
+    decidedBy: 'Todd',
+  };
+
+  function statusRunner(status: unknown): CommandRunner {
+    return async () => ({
+      stdout: JSON.stringify({
+        status,
+        artifact_id: 'PRD-DEMO-001',
+        path: '/i/docs/sdlc/prd.md',
+        frozen_count: 3,
+        decided_by: 'Todd',
+      }),
+      stderr: '',
+      code: 0,
+    });
+  }
+
+  it('reports what the harness actually said, not a hardcoded literal', async () => {
+    // Both sides used to hardcode 'frozen': the harness printed the literal
+    // instead of its enum, and this service parsed that field and threw it
+    // away. They agreed only because they invented the same string.
+    const svc = new HarnessFreezeService(['harness'], { runner: statusRunner('FROZEN') });
+    expect((await svc.freeze('/i', req)).status).toBe('FROZEN');
+  });
+
+  it('rejects the OLD lowercase literal rather than silently accepting it', async () => {
+    const svc = new HarnessFreezeService(['harness'], { runner: statusRunner('frozen') });
+    await expect(svc.freeze('/i', req)).rejects.toThrow(HarnessFreezeError);
+  });
+
+  it('rejects an unknown status instead of coercing it to frozen', async () => {
+    const svc = new HarnessFreezeService(['harness'], { runner: statusRunner('BANANA') });
+    await expect(svc.freeze('/i', req)).rejects.toThrow(/unknown freeze status/);
+  });
+
+  it('surfaces a non-FROZEN canonical status instead of claiming FROZEN', async () => {
+    // The old code returned 'frozen' unconditionally, so ANY outcome would have
+    // been reported to the UI as a successful freeze.
+    const svc = new HarnessFreezeService(['harness'], { runner: statusRunner('FREEZE_PENDING') });
+    expect((await svc.freeze('/i', req)).status).toBe('FREEZE_PENDING');
+  });
+});
+
 describe('HarnessFreezeService', () => {
   it('freezes through the harness CLI and returns the result', async () => {
     const cap: { file?: string; args?: string[]; decision?: Record<string, unknown> } = {};
@@ -39,7 +87,7 @@ describe('HarnessFreezeService', () => {
       shownContent: CONTENT,
       decidedBy: 'Todd',
     });
-    expect(res.status).toBe('frozen');
+    expect(res.status).toBe('FROZEN');
     expect(res.frozenCount).toBe(3);
   });
 
@@ -86,7 +134,7 @@ describe('HarnessFreezeService', () => {
     const seen: string[] = [];
     const runner: CommandRunner = async (_f, args) => {
       seen.push(args[args.indexOf('--decision') + 1]);
-      return { stdout: JSON.stringify({ status: 'frozen', artifact_id: 'A', path: 'p', frozen_count: null, decided_by: 'T' }), stderr: '', code: 0 };
+      return { stdout: JSON.stringify({ status: 'FROZEN', artifact_id: 'A', path: 'p', frozen_count: null, decided_by: 'T' }), stderr: '', code: 0 };
     };
     const svc = new HarnessFreezeService(['harness'], { runner });
     await svc.freeze('/i', { artifactId: 'A', outcome: 'APPROVE', shownContent: CONTENT, decidedBy: 'Todd' });
@@ -113,7 +161,7 @@ describe('HarnessFreezeService <-> e2e fake harness (real subprocess)', () => {
       shownContent: CONTENT,
       decidedBy: 'console-user',
     });
-    expect(res.status).toBe('frozen');
+    expect(res.status).toBe('FROZEN');
     expect(res.artifactId).toBe('PRD-E2E-001');
     expect(res.decidedBy).toBe('console-user');
   });

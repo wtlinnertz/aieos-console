@@ -12,6 +12,32 @@ export type FreezeStatus =
   | 'HALTED'
   | 'FAULTED';
 
+const ALL_FREEZE_STATUSES: readonly FreezeStatus[] = [
+  'DRAFT',
+  'VALIDATED',
+  'FREEZE_PENDING',
+  'FROZEN',
+  'HALTED',
+  'FAULTED',
+];
+
+/**
+ * Narrow an unknown value (e.g. parsed from the harness CLI's stdout) to the
+ * canonical vocabulary (G-14).
+ *
+ * The freeze seam used to carry a hardcoded lowercase 'frozen' on BOTH sides:
+ * the harness printed the literal instead of its enum, and this service parsed
+ * that field and discarded it, hardcoding its own copy. They agreed only
+ * because both invented the same string -- so any status other than FROZEN
+ * would still have been reported as FROZEN. Parse it; don't assume it.
+ */
+export function isFreezeStatus(value: unknown): value is FreezeStatus {
+  return (
+    typeof value === 'string' &&
+    (ALL_FREEZE_STATUSES as readonly string[]).includes(value)
+  );
+}
+
 /** Andon fault states (ADR-0004): the run stood down and needs a human. */
 export function isFaultState(status: FreezeStatus): boolean {
   return status === 'HALTED' || status === 'FAULTED';
