@@ -12,7 +12,11 @@ const opt = (name) => {
 if (cmd === 'freeze') {
   process.stdout.write(
     JSON.stringify({
-      status: 'frozen',
+      // G-14: must mirror the real harness, which emits the canonical FR-018
+      // status from its enum. A fake that speaks a dialect the real thing
+      // doesn't is worse than no fake -- see the console's flow.yaml, which
+      // exists nowhere but its own fixtures (G-1).
+      status: 'FROZEN',
       artifact_id: opt('--artifact') ?? '',
       path: 'docs/sdlc/frozen.md',
       frozen_count: 1,

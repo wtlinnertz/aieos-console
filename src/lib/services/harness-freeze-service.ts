@@ -4,6 +4,8 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
+import { isFreezeStatus, type FreezeStatus } from '@/lib/freeze-status';
+
 /**
  * HarnessFreezeService — the console's freeze seam (ADR-0003).
  *
@@ -40,7 +42,12 @@ export interface FreezeRequest {
 }
 
 export interface FreezeSuccess {
-  status: 'frozen';
+  /**
+   * The canonical FR-018 status the harness actually reported (G-14). This was
+   * the literal type 'frozen' -- lowercase, hardcoded, and never derived from
+   * the harness's answer.
+   */
+  status: FreezeStatus;
   artifactId: string;
   path: string;
   frozenCount: number | null;
@@ -149,8 +156,18 @@ export class HarnessFreezeService {
         frozen_count: number | null;
         decided_by: string;
       };
+      // G-14: consume what the harness reported, in the canonical vocabulary.
+      // Reject anything outside it rather than coercing -- a status we don't
+      // recognise means the seam has drifted, and silently rewriting it to
+      // 'frozen' is precisely how this went unnoticed.
+      if (!isFreezeStatus(parsed.status)) {
+        throw new HarnessFreezeError(
+          'bad_status',
+          `harness returned unknown freeze status ${JSON.stringify(parsed.status)}`,
+        );
+      }
       return {
-        status: 'frozen',
+        status: parsed.status,
         artifactId: parsed.artifact_id,
         path: parsed.path,
         frozenCount: parsed.frozen_count,
