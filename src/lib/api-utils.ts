@@ -20,6 +20,17 @@ const NOT_FOUND_ERRORS = new Set([
   'StateNotFoundError',
   'StepNotFoundError',
   'FlowDefinitionNotFoundError',
+  'KitNotInManifestError',
+]);
+
+// FR-023 (D4): manifest/config failures are fail-closed and operator-fixable
+// — 503, with the structured code preserved (e.g. MANIFEST_VERSION_SKEW).
+const UNAVAILABLE_ERRORS = new Set([
+  'ManifestNotFoundError',
+  'ManifestParseError',
+  'ManifestVersionSkewError',
+  'RepoCheckoutMissingError',
+  'ConventionResolutionError',
 ]);
 
 function getErrorCode(err: Error): string {
@@ -45,6 +56,10 @@ export function errorResponse(err: unknown): NextResponse<ErrorBody> {
 
   if (NOT_FOUND_ERRORS.has(err.name)) {
     return NextResponse.json({ error: err.message, code }, { status: 404 });
+  }
+
+  if (UNAVAILABLE_ERRORS.has(err.name)) {
+    return NextResponse.json({ error: err.message, code }, { status: 503 });
   }
 
   return NextResponse.json(

@@ -28,6 +28,9 @@ export default defineConfig({
       LLM_API_KEY: 'test-key',
       LLM_MODEL: 'mock-model',
       HARNESS_CMD: `node ${fakeHarness}`,
+      // TEMPORARY (FR-023 O1): the e2e fixture still ships a flow.yaml;
+      // removed when the fixture migrates to a kit-manifest.yml (step 5).
+      FLOW_SOURCE: 'flow-yaml',
     },
   },
 });

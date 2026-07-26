@@ -1,6 +1,8 @@
 import { loadConfig } from '@/lib/config';
 import { FilesystemService } from './filesystem-service';
 import { KitService, type IKitService } from './kit-service';
+import { ManifestService, type IManifestService } from './manifest-service';
+import { ManifestKitService } from './manifest-kit-service';
 import { StateService, type IStateService } from './state-service';
 import { LlmService } from './llm-service';
 import { AnthropicProvider } from './anthropic-provider';
@@ -17,6 +19,8 @@ interface Services {
   state: IStateService;
   llm: ILlmService;
   orchestration: IOrchestrationService;
+  /** Present only when flowSource === 'manifest' (FR-023). */
+  manifest: IManifestService | null;
 }
 
 let instance: Services | null = null;
@@ -33,7 +37,19 @@ export function getServices(): Services {
     kitDirs: config.kitDirs,
   });
 
-  const kit = new KitService(filesystem);
+  // FR-023 (O1): kit-manifest.yml is the flow source of truth; the legacy
+  // flow.yaml loader stays behind FLOW_SOURCE=flow-yaml for >=1 release.
+  let manifest: IManifestService | null = null;
+  let kit: IKitService;
+  if (config.flowSource === 'flow-yaml') {
+    kit = new KitService(filesystem);
+  } else {
+    manifest = new ManifestService({
+      manifestPath: config.manifestPath,
+      kitRoot: config.kitRoot,
+    });
+    kit = new ManifestKitService(filesystem, manifest);
+  }
   const state = new StateService(filesystem);
 
   const llm = new LlmService();
@@ -52,7 +68,7 @@ export function getServices(): Services {
   );
   const orchestration = new OrchestrationService(kit, state, llm, freeze);
 
-  instance = { filesystem, kit, state, llm, orchestration };
+  instance = { filesystem, kit, state, llm, orchestration, manifest };
   return instance;
 }
 
