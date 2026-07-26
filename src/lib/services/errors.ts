@@ -182,3 +182,52 @@ export class StepNotEditableError extends Error {
     this.name = 'StepNotEditableError';
   }
 }
+
+// --- FR-023 manifest-as-flow-source errors (all fail-closed, D4) ---
+
+export class ManifestNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ManifestNotFoundError';
+  }
+}
+
+export class ManifestParseError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ManifestParseError';
+  }
+}
+
+export class ManifestVersionSkewError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ManifestVersionSkewError';
+  }
+}
+
+export class RepoCheckoutMissingError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RepoCheckoutMissingError';
+  }
+}
+
+export class KitNotInManifestError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'KitNotInManifestError';
+  }
+}
+
+/**
+ * A file required by the artifact-file convention is missing (R2). Raised at
+ * load, naming the kit, artifact, and exact expected path — a missing
+ * validator is a hard error, never "no validator to run".
+ */
+export class ConventionResolutionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConventionResolutionError';
+  }
+}

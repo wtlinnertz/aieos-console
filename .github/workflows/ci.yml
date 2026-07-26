@@ -9,6 +9,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # aieos-governance-foundation — kit-manifest.yml + the convention
+      # conformance fixture the FR-023 deriveFlow tests assert against
+      # (they skip when this checkout is absent)
+      - uses: actions/checkout@v4
+        with:
+          repository: wtlinnertz/aieos-governance-foundation
+          ref: main
+          path: aieos-governance-foundation
       - uses: actions/setup-node@v4
         with:
           node-version: "22"

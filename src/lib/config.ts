@@ -1,3 +1,5 @@
+import * as path from 'node:path';
+
 export interface AppConfig {
   projectDir: string;
   kitDirs: string[];
@@ -7,6 +9,12 @@ export interface AppConfig {
   port: string;
   harnessCmd: string;
   harnessCwd: string | null;
+  /** FR-023 O1: 'manifest' (default) or the legacy 'flow-yaml' loader. */
+  flowSource: 'manifest' | 'flow-yaml';
+  /** Directory containing the kit checkouts (incl. governance-foundation). */
+  kitRoot: string;
+  /** Path to kit-manifest.yml; empty = fail closed at load (D4). */
+  manifestPath: string;
 }
 
 export function loadConfig(): AppConfig {
@@ -20,6 +28,15 @@ export function loadConfig(): AppConfig {
   const harnessCmd = process.env.HARNESS_CMD ?? 'harness';
   const harnessCwd = process.env.HARNESS_CWD ?? null;
 
+  const flowSource =
+    process.env.FLOW_SOURCE === 'flow-yaml' ? 'flow-yaml' : 'manifest';
+  const kitRoot = process.env.KIT_ROOT ?? '';
+  const manifestPath =
+    process.env.MANIFEST_PATH ??
+    (kitRoot
+      ? path.join(kitRoot, 'aieos-governance-foundation', 'kit-manifest.yml')
+      : '');
+
   return {
     projectDir,
     kitDirs,
@@ -29,5 +46,8 @@ export function loadConfig(): AppConfig {
     port,
     harnessCmd,
     harnessCwd,
+    flowSource,
+    kitRoot,
+    manifestPath,
   };
 }

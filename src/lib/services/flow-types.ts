@@ -23,6 +23,13 @@ export interface FlowStep {
   requiredInputs: { path: string; role: string }[];
   produces: { artifactIdPrefix: string; outputFilename: string };
   freezeGate: boolean;
+  /**
+   * Cross-kit `freeze` edges into this step (FR-023 R3), as "KIT:ARTIFACT"
+   * refs. Rendered as non-interactive upstream FROZEN preconditions —
+   * displayed and checked, never dropped, never a drivable in-flow step.
+   * Absent/empty for flow.yaml-sourced definitions.
+   */
+  upstreamPreconditions?: string[];
 }
 
 export interface HandoffDefinition {
