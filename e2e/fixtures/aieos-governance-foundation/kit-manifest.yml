@@ -1,0 +1,32 @@
+# E2E fixture manifest (FR-023): the console's tests exercise the SAME
+# format every other driver reads — kit-manifest.yml + the artifact-file
+# convention — instead of the retired console-private flow.yaml. Placed under
+# a fixture aieos-governance-foundation/ dir so the default MANIFEST_PATH
+# resolution (KIT_ROOT/aieos-governance-foundation/kit-manifest.yml) is what
+# the tests exercise too.
+manifest_version: "1.0"
+
+kits:
+  TEK:
+    layer: 4
+    full_name: "E2E Test Kit"
+    repository: "test-kit"
+    category: "pipeline"
+    status: "built"
+    artifacts:
+      - id: PRD
+        full_name: "Product Requirements"
+        spec_file: "prd-spec.md"
+        human_authored: false
+        optional: false
+      - id: ACF
+        full_name: "Acceptance Criteria"
+        spec_file: "acf-spec.md"
+        human_authored: false
+        optional: false
+    artifact_flow:
+      - PRD
+      - ACF
+
+dependency_edges:
+  - { from: "TEK:PRD", to: "TEK:ACF", type: "freeze" }

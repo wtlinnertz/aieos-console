@@ -29,7 +29,7 @@ test.describe.serial('Content editing', () => {
       data: {
         projectDir: testProjectDir,
         kitConfigs: [
-          { kitId: 'e2e-test-kit', kitPath: testKitDir },
+          { kitId: 'TEK', kitPath: testKitDir },
         ],
         llmConfigs: [
           { providerId: 'mock', model: 'mock-model', apiKeyEnvVar: 'LLM_API_KEY' },
@@ -39,16 +39,16 @@ test.describe.serial('Content editing', () => {
     expect(initResponse.status()).toBe(200);
 
     // Initiate step
-    const initiateResponse = await request.post('/api/flow/e2e-test-kit/step/step-prd/initiate');
+    const initiateResponse = await request.post('/api/flow/TEK/step/prd/initiate');
     expect(initiateResponse.ok()).toBeTruthy();
 
     // Generate artifact
-    const generateResponse = await request.get('/api/flow/e2e-test-kit/step/step-prd/generate');
+    const generateResponse = await request.get('/api/flow/TEK/step/prd/generate');
     expect(generateResponse.ok()).toBeTruthy();
   });
 
   test('PUT content updates artifact and state remains draft', async ({ request }) => {
-    const response = await request.put('/api/flow/e2e-test-kit/step/step-prd/content', {
+    const response = await request.put('/api/flow/TEK/step/prd/content', {
       data: { content: '# Edited PRD\n\nThis content was manually edited.' },
     });
     expect(response.ok()).toBeTruthy();
@@ -56,35 +56,35 @@ test.describe.serial('Content editing', () => {
     expect(body.success).toBe(true);
 
     // Verify state is still draft
-    const flowResponse = await request.get('/api/flow/e2e-test-kit');
+    const flowResponse = await request.get('/api/flow/TEK');
     const flowBody = await flowResponse.json();
-    const prdStep = flowBody.steps.find((s: { step: { id: string } }) => s.step.id === 'step-prd');
+    const prdStep = flowBody.steps.find((s: { step: { id: string } }) => s.step.id === 'prd');
     expect(prdStep.state.status).toBe('draft');
   });
 
   test('edit after validation resets state to draft', async ({ request }) => {
     // Validate first
-    const validateResponse = await request.post('/api/flow/e2e-test-kit/step/step-prd/validate');
+    const validateResponse = await request.post('/api/flow/TEK/step/prd/validate');
     expect(validateResponse.ok()).toBeTruthy();
     const valBody = await validateResponse.json();
     expect(valBody.status).toBe('PASS');
 
     // Verify state is validated-pass
-    let flowResponse = await request.get('/api/flow/e2e-test-kit');
+    let flowResponse = await request.get('/api/flow/TEK');
     let flowBody = await flowResponse.json();
-    let prdStep = flowBody.steps.find((s: { step: { id: string } }) => s.step.id === 'step-prd');
+    let prdStep = flowBody.steps.find((s: { step: { id: string } }) => s.step.id === 'prd');
     expect(prdStep.state.status).toBe('validated-pass');
 
     // Edit content
-    const editResponse = await request.put('/api/flow/e2e-test-kit/step/step-prd/content', {
+    const editResponse = await request.put('/api/flow/TEK/step/prd/content', {
       data: { content: '# Re-edited PRD\n\nEdited after validation.' },
     });
     expect(editResponse.ok()).toBeTruthy();
 
     // Verify state reset to draft
-    flowResponse = await request.get('/api/flow/e2e-test-kit');
+    flowResponse = await request.get('/api/flow/TEK');
     flowBody = await flowResponse.json();
-    prdStep = flowBody.steps.find((s: { step: { id: string } }) => s.step.id === 'step-prd');
+    prdStep = flowBody.steps.find((s: { step: { id: string } }) => s.step.id === 'prd');
     expect(prdStep.state.status).toBe('draft');
   });
 });

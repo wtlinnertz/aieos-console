@@ -28,7 +28,7 @@ test.describe.serial('Error handling', () => {
       data: {
         projectDir: testProjectDir,
         kitConfigs: [
-          { kitId: 'e2e-test-kit', kitPath: testKitDir },
+          { kitId: 'TEK', kitPath: testKitDir },
         ],
         llmConfigs: [
           { providerId: 'mock', model: 'mock-model', apiKeyEnvVar: 'LLM_API_KEY' },
@@ -44,17 +44,17 @@ test.describe.serial('Error handling', () => {
   });
 
   test('POST initiate on step with unmet dependencies returns 409', async ({ request }) => {
-    const response = await request.post('/api/flow/e2e-test-kit/step/step-acf/initiate');
+    const response = await request.post('/api/flow/TEK/step/acf/initiate');
     expect(response.status()).toBe(409);
   });
 
   test('POST freeze on non-validated step returns 409', async ({ request }) => {
-    // Initiate step-prd first so it exists in state
-    const initiateResponse = await request.post('/api/flow/e2e-test-kit/step/step-prd/initiate');
+    // Initiate prd first so it exists in state
+    const initiateResponse = await request.post('/api/flow/TEK/step/prd/initiate');
     expect(initiateResponse.ok()).toBeTruthy();
 
     // Try to freeze without validating
-    const response = await request.post('/api/flow/e2e-test-kit/step/step-prd/freeze', {
+    const response = await request.post('/api/flow/TEK/step/prd/freeze', {
       data: { artifactId: 'PRD-E2E-001' },
     });
     expect(response.status()).toBe(409);
