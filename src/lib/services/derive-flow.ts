@@ -60,7 +60,15 @@ export function deriveFlow(
         prompt: artifact.humanAuthored ? null : `docs/prompts/${token}-prompt.md`,
         validator: `docs/validators/${token}-validator.md`,
       },
-      requiredInputs: [],
+      // G-3/G-5 (manifest 1.1): declared inputs become required inputs;
+      // upstream-sourced entries stay modeled by dependency_edges.
+      requiredInputs: artifact.inputs
+        .filter((i) => i.source !== 'upstream')
+        .map((i) => ({
+          path: i.ref,
+          role: i.role,
+          source: i.source as 'framework' | 'human',
+        })),
       produces: {
         artifactIdPrefix: artifact.id,
         outputFilename: `${token}.md`,

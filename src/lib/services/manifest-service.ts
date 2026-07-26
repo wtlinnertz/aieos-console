@@ -212,12 +212,32 @@ export class ManifestService implements IManifestService {
           `Kit "${abbr}": every artifact needs id and spec_file`,
         );
       }
+      const inputs = Array.isArray(art.inputs)
+        ? (art.inputs as Record<string, unknown>[]).map((inp, idx) => {
+            if (
+              typeof inp.ref !== 'string' ||
+              typeof inp.role !== 'string' ||
+              !['human', 'framework', 'upstream'].includes(inp.source as string)
+            ) {
+              throw new ManifestParseError(
+                `Kit "${abbr}"/${art.id}: inputs[${idx}] needs ref, role, ` +
+                  'and source (human|framework|upstream)',
+              );
+            }
+            return {
+              ref: inp.ref,
+              role: inp.role,
+              source: inp.source as 'human' | 'framework' | 'upstream',
+            };
+          })
+        : [];
       return {
         id: art.id,
         fullName: (art.full_name as string) ?? art.id,
         specFile: art.spec_file,
         humanAuthored: art.human_authored === true,
         optional: art.optional === true,
+        inputs,
       };
     });
 

@@ -5,12 +5,20 @@
  * mirror the fields the console consumes.
  */
 
+export interface ManifestInput {
+  ref: string;
+  role: string;
+  source: 'human' | 'framework' | 'upstream';
+}
+
 export interface ManifestArtifact {
   id: string;
   fullName: string;
   specFile: string;
   humanAuthored: boolean;
   optional: boolean;
+  /** G-3/G-5 (manifest 1.1): declared non-upstream inputs. */
+  inputs: ManifestInput[];
 }
 
 export interface ManifestKit {

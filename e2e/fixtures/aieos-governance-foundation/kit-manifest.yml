@@ -19,6 +19,10 @@ kits:
         spec_file: "req-spec.md"
         human_authored: false
         optional: false
+        # G-3 (manifest 1.1): exercises framework-input assembly in e2e —
+        # kit-relative, mandatory, flows into the generation request.
+        inputs:
+          - { ref: "docs/brief.md", role: "brief", source: "framework" }
       - id: CRIT
         full_name: "Criteria"
         spec_file: "crit-spec.md"

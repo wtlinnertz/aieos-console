@@ -66,19 +66,11 @@ export function getServices(): Services {
     cwd: config.harnessCwd ?? undefined,
   });
 
-  // A3 (FR-023): the G-3 list — prompts that declare mandatory principles
-  // inputs the manifest cannot express until `inputs:` lands. Applies only
-  // when the manifest is the flow source; removed with manifest inputs:.
-  const PRINCIPLES_DENYLIST = ['prd', 'acf', 'dcf', 'dkr', 'tdd'];
-  const orchestration = new OrchestrationService(
-    kit,
-    state,
-    llm,
-    freeze,
-    config.flowSource === 'manifest'
-      ? { denyGenerationFor: PRINCIPLES_DENYLIST, entryGatesBlocked: true }
-      : {},
-  );
+  // G-3 closed (manifest 1.1): principles and the entry brief are declared
+  // `inputs:` and flow into generation via step-input assembly, so the
+  // interim A3 deny-list and the D2 entry-gate deferral block are retired.
+  // The OrchestrationOptions mechanism stays for any future governance gate.
+  const orchestration = new OrchestrationService(kit, state, llm, freeze);
 
   instance = { filesystem, kit, state, llm, orchestration, manifest };
   return instance;
