@@ -27,6 +27,10 @@ import {
   StepNotFoundError,
 } from './errors.js';
 import type { HarnessFreezeService } from './harness-freeze-service.js';
+import {
+  parseDocumentControl,
+  type DocumentControlBlock,
+} from './document-control.js';
 
 /** FR-023 governance-mode options (manifest flow source only). */
 export interface OrchestrationOptions {
@@ -75,6 +79,28 @@ export class OrchestrationService implements IOrchestrationService {
     this.entryGatesBlocked = options.entryGatesBlocked ?? false;
   }
 
+  /**
+   * N1 (FR-023 / FR-018): read the step's on-disk Document Control block —
+   * the canonical freeze truth every driver shares. Returns null when the
+   * artifact file or its block is absent. state.json is only a workflow
+   * cache; without this read, a FREEZE_PENDING artifact produced by the
+   * dark factory is invisible to the console.
+   */
+  private async canonicalBlockFor(
+    projectDir: string,
+    step: FlowStep,
+  ): Promise<{ block: DocumentControlBlock; relativePath: string } | null> {
+    const relativePath = `docs/sdlc/${step.produces.outputFilename}`;
+    let content: string;
+    try {
+      content = await this.stateService.readArtifact(projectDir, relativePath);
+    } catch {
+      return null;
+    }
+    const block = parseDocumentControl(content);
+    return block ? { block, relativePath } : null;
+  }
+
   /** FR-023 D2/A3: why this step cannot be driven right now, or null. */
   private blockedReasonFor(step: FlowStep): string | null {
     if (this.entryGatesBlocked && step.stepType === 'human-intake') {
@@ -102,6 +128,26 @@ export class OrchestrationService implements IOrchestrationService {
       );
       const state = existingState ?? defaultArtifactState(step.id, kitId);
 
+      // N1: the on-disk Document Control block outranks the state.json
+      // cache (FR-018 single source of freeze truth). FROZEN and
+      // FREEZE_PENDING written by any driver become visible here — a
+      // read-side projection; the cache file itself is not rewritten.
+      const canonical = await this.canonicalBlockFor(projectDir, step);
+      if (canonical?.block.status === 'FROZEN' && state.status !== 'frozen') {
+        state.status = 'frozen';
+        state.artifactPath = canonical.relativePath;
+        state.artifactId = canonical.block.artifactId;
+      } else if (
+        canonical?.block.status === 'FREEZE_PENDING' &&
+        state.status !== 'frozen'
+      ) {
+        // A converged artifact parked at the freeze gate: reviewable and
+        // freezable by the human — the console's validated-pass.
+        state.status = 'validated-pass';
+        state.artifactPath = canonical.relativePath;
+        state.artifactId = canonical.block.artifactId;
+      }
+
       const dependenciesMet = this.areDependenciesMet(
         step,
         projectState.artifacts,
@@ -113,6 +159,7 @@ export class OrchestrationService implements IOrchestrationService {
         dependenciesMet,
         isCurrentStep: false,
         blockedReason: this.blockedReasonFor(step),
+        canonicalStatus: canonical?.block.status ?? null,
       });
     }
 
@@ -424,15 +471,40 @@ export class OrchestrationService implements IOrchestrationService {
     stepId: string,
     artifactId: string,
   ): Promise<void> {
-    const currentState = await this.stateService.getArtifactState(
-      projectDir,
-      stepId,
-    );
+    let cachedState: ArtifactState | null;
+    try {
+      cachedState = await this.stateService.getArtifactState(projectDir, stepId);
+    } catch {
+      cachedState = null;
+    }
 
-    if (currentState.status !== 'validated-pass') {
-      throw new StepNotValidatedPassError(
-        `Step "${stepId}" is "${currentState.status}", expected "validated-pass" to freeze`,
-      );
+    let artifactPath: string | null = null;
+    if (cachedState?.status === 'validated-pass' && cachedState.artifactPath) {
+      artifactPath = cachedState.artifactPath;
+    } else {
+      // N1 (FR-018): accept the canonical on-disk state. An artifact another
+      // driver (the dark factory) parked at the freeze gate carries
+      // FREEZE_PENDING in its Document Control block but has no console
+      // cache entry — the block is the source of truth, so the human can
+      // freeze it here.
+      const kitPath = await this.resolveKitPath(projectDir, kitId);
+      const kit = await this.kitService.loadKit(kitPath);
+      const step = this.findStep(kit.flow.steps, stepId);
+      const canonical = await this.canonicalBlockFor(projectDir, step);
+      if (
+        canonical?.block.status === 'FREEZE_PENDING' ||
+        canonical?.block.status === 'VALIDATED'
+      ) {
+        artifactPath = canonical.relativePath;
+      } else {
+        throw new StepNotValidatedPassError(
+          `Step "${stepId}" is "${cachedState?.status ?? 'not-started'}" and ` +
+            `its Document Control block is ` +
+            `${canonical ? `"${canonical.block.rawStatus}"` : 'absent'} — ` +
+            'expected validated-pass (cache) or FREEZE_PENDING/VALIDATED ' +
+            '(canonical block) to freeze',
+        );
+      }
     }
 
     // FR-020: the console freezes THROUGH the harness (the single FROZEN writer,
@@ -442,15 +514,12 @@ export class OrchestrationService implements IOrchestrationService {
     if (this.freezeService === null) {
       throw new Error('Harness freeze service is not configured');
     }
-    if (currentState.artifactPath === null) {
-      throw new Error(`Step "${stepId}" has no artifact to freeze`);
-    }
     // Hash the artifact content shown to the human (decision integrity, ADR-0003).
     // validated-pass artifacts are not editable, so the on-disk content is what
     // was shown.
     const shownContent = await this.stateService.readArtifact(
       projectDir,
-      currentState.artifactPath,
+      artifactPath,
     );
     const result = await this.freezeService.freeze(projectDir, {
       artifactId,
@@ -473,6 +542,7 @@ export class OrchestrationService implements IOrchestrationService {
     await this.stateService.updateArtifactState(projectDir, stepId, {
       status: 'frozen',
       artifactId,
+      artifactPath,
       frozenAt: new Date().toISOString(),
     });
   }

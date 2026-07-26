@@ -20,6 +20,12 @@ export interface StepStatus {
    * null when drivable. Never a silent no-op.
    */
   blockedReason: string | null;
+  /**
+   * N1 (FR-018): the canonical freeze status read from the artifact's
+   * on-disk Document Control block, or null when no block exists. The
+   * source of truth every driver shares; `state` is reconciled against it.
+   */
+  canonicalStatus: string | null;
 }
 
 export interface StepContext {

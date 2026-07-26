@@ -53,6 +53,7 @@ function makeStepStatus(
     dependenciesMet: true,
     isCurrentStep: false,
     blockedReason: null,
+    canonicalStatus: null,
     ...rest,
   };
 }
