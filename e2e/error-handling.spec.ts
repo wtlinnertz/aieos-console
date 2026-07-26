@@ -44,18 +44,18 @@ test.describe.serial('Error handling', () => {
   });
 
   test('POST initiate on step with unmet dependencies returns 409', async ({ request }) => {
-    const response = await request.post('/api/flow/TEK/step/acf/initiate');
+    const response = await request.post('/api/flow/TEK/step/crit/initiate');
     expect(response.status()).toBe(409);
   });
 
   test('POST freeze on non-validated step returns 409', async ({ request }) => {
     // Initiate prd first so it exists in state
-    const initiateResponse = await request.post('/api/flow/TEK/step/prd/initiate');
+    const initiateResponse = await request.post('/api/flow/TEK/step/req/initiate');
     expect(initiateResponse.ok()).toBeTruthy();
 
     // Try to freeze without validating
-    const response = await request.post('/api/flow/TEK/step/prd/freeze', {
-      data: { artifactId: 'PRD-E2E-001' },
+    const response = await request.post('/api/flow/TEK/step/req/freeze', {
+      data: { artifactId: 'REQ-E2E-001' },
     });
     expect(response.status()).toBe(409);
   });

@@ -39,16 +39,16 @@ test.describe.serial('Content editing', () => {
     expect(initResponse.status()).toBe(200);
 
     // Initiate step
-    const initiateResponse = await request.post('/api/flow/TEK/step/prd/initiate');
+    const initiateResponse = await request.post('/api/flow/TEK/step/req/initiate');
     expect(initiateResponse.ok()).toBeTruthy();
 
     // Generate artifact
-    const generateResponse = await request.get('/api/flow/TEK/step/prd/generate');
+    const generateResponse = await request.get('/api/flow/TEK/step/req/generate');
     expect(generateResponse.ok()).toBeTruthy();
   });
 
   test('PUT content updates artifact and state remains draft', async ({ request }) => {
-    const response = await request.put('/api/flow/TEK/step/prd/content', {
+    const response = await request.put('/api/flow/TEK/step/req/content', {
       data: { content: '# Edited PRD\n\nThis content was manually edited.' },
     });
     expect(response.ok()).toBeTruthy();
@@ -58,13 +58,13 @@ test.describe.serial('Content editing', () => {
     // Verify state is still draft
     const flowResponse = await request.get('/api/flow/TEK');
     const flowBody = await flowResponse.json();
-    const prdStep = flowBody.steps.find((s: { step: { id: string } }) => s.step.id === 'prd');
+    const prdStep = flowBody.steps.find((s: { step: { id: string } }) => s.step.id === 'req');
     expect(prdStep.state.status).toBe('draft');
   });
 
   test('edit after validation resets state to draft', async ({ request }) => {
     // Validate first
-    const validateResponse = await request.post('/api/flow/TEK/step/prd/validate');
+    const validateResponse = await request.post('/api/flow/TEK/step/req/validate');
     expect(validateResponse.ok()).toBeTruthy();
     const valBody = await validateResponse.json();
     expect(valBody.status).toBe('PASS');
@@ -72,11 +72,11 @@ test.describe.serial('Content editing', () => {
     // Verify state is validated-pass
     let flowResponse = await request.get('/api/flow/TEK');
     let flowBody = await flowResponse.json();
-    let prdStep = flowBody.steps.find((s: { step: { id: string } }) => s.step.id === 'prd');
+    let prdStep = flowBody.steps.find((s: { step: { id: string } }) => s.step.id === 'req');
     expect(prdStep.state.status).toBe('validated-pass');
 
     // Edit content
-    const editResponse = await request.put('/api/flow/TEK/step/prd/content', {
+    const editResponse = await request.put('/api/flow/TEK/step/req/content', {
       data: { content: '# Re-edited PRD\n\nEdited after validation.' },
     });
     expect(editResponse.ok()).toBeTruthy();
@@ -84,7 +84,7 @@ test.describe.serial('Content editing', () => {
     // Verify state reset to draft
     flowResponse = await request.get('/api/flow/TEK');
     flowBody = await flowResponse.json();
-    prdStep = flowBody.steps.find((s: { step: { id: string } }) => s.step.id === 'prd');
+    prdStep = flowBody.steps.find((s: { step: { id: string } }) => s.step.id === 'req');
     expect(prdStep.state.status).toBe('draft');
   });
 });

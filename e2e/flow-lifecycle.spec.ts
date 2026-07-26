@@ -44,21 +44,21 @@ test.describe.serial('Flow lifecycle', () => {
     const body = await response.json();
     expect(body.totalSteps).toBe(2);
     expect(body.steps).toHaveLength(2);
-    expect(body.steps[0].step.id).toBe('prd');
-    expect(body.steps[1].step.id).toBe('acf');
+    expect(body.steps[0].step.id).toBe('req');
+    expect(body.steps[1].step.id).toBe('crit');
     expect(body.completedSteps).toBe(0);
   });
 
   test('POST initiate prd transitions to in-progress', async ({ request }) => {
-    const response = await request.post('/api/flow/TEK/step/prd/initiate');
+    const response = await request.post('/api/flow/TEK/step/req/initiate');
     expect(response.ok()).toBeTruthy();
     const body = await response.json();
-    expect(body.step.id).toBe('prd');
+    expect(body.step.id).toBe('req');
     expect(body.state.status).toBe('in-progress');
   });
 
   test('GET generate prd returns SSE stream with chunks', async ({ request }) => {
-    const response = await request.get('/api/flow/TEK/step/prd/generate');
+    const response = await request.get('/api/flow/TEK/step/req/generate');
     expect(response.ok()).toBeTruthy();
 
     const text = await response.text();
@@ -77,7 +77,7 @@ test.describe.serial('Flow lifecycle', () => {
   });
 
   test('POST validate prd returns PASS', async ({ request }) => {
-    const response = await request.post('/api/flow/TEK/step/prd/validate');
+    const response = await request.post('/api/flow/TEK/step/req/validate');
     expect(response.ok()).toBeTruthy();
     const body = await response.json();
     expect(body.status).toBe('PASS');
@@ -85,8 +85,8 @@ test.describe.serial('Flow lifecycle', () => {
   });
 
   test('POST freeze prd with artifactId succeeds', async ({ request }) => {
-    const response = await request.post('/api/flow/TEK/step/prd/freeze', {
-      data: { artifactId: 'PRD-E2E-001' },
+    const response = await request.post('/api/flow/TEK/step/req/freeze', {
+      data: { artifactId: 'REQ-E2E-001' },
     });
     expect(response.ok()).toBeTruthy();
     const body = await response.json();
@@ -98,8 +98,8 @@ test.describe.serial('Flow lifecycle', () => {
     expect(response.ok()).toBeTruthy();
     const body = await response.json();
 
-    const prdStep = body.steps.find((s: { step: { id: string } }) => s.step.id === 'prd');
-    const acfStep = body.steps.find((s: { step: { id: string } }) => s.step.id === 'acf');
+    const prdStep = body.steps.find((s: { step: { id: string } }) => s.step.id === 'req');
+    const acfStep = body.steps.find((s: { step: { id: string } }) => s.step.id === 'crit');
 
     expect(prdStep.state.status).toBe('frozen');
     expect(acfStep.dependenciesMet).toBe(true);

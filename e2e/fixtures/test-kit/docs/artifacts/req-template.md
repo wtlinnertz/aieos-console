@@ -1,11 +1,13 @@
-# ACF Template
+# PRD Template
 
 ## Document Control
 
 | Field | Value |
 |-------|-------|
-| Artifact ID | ACF-{PROJECT}-{NNN} |
+| Artifact ID | REQ-{PROJECT}-{NNN} |
 | Owner | {owner} |
 | Status | DRAFT |
 
-## Criteria
+## Overview
+
+## Requirements
