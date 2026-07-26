@@ -77,6 +77,46 @@ describe('HarnessFreezeService canonical status (G-14)', () => {
   });
 });
 
+describe('hashArtifact LF normalization (G-19)', () => {
+  // The cross-language hash contract: the same literal digest is pinned in the
+  // harness suite (tests/test_freeze.py). If one of these assertions has to
+  // change, the console and the harness no longer agree on artifact identity —
+  // update both or neither.
+  const G19_FIXTURE_LF =
+    '# SAD\n\n| Artifact ID | SAD-TEST-001 |\n| Status | FREEZE_PENDING |\n';
+  const G19_FIXTURE_CRLF = G19_FIXTURE_LF.replace(/\n/g, '\r\n');
+  const G19_FIXTURE_DIGEST =
+    'fce70731c15162436e1d5c70294e025229fa74726bac0332e8a9f70e03437b6f';
+
+  it('hashes CRLF and LF spellings of the same text identically', () => {
+    // Windows-written artifacts are CRLF on disk; the harness hashes
+    // read_text() output where CRLF is already folded to LF. Hashing raw
+    // content here made every console freeze of one fail hash_mismatch.
+    expect(hashArtifact('a\r\nb\r\n')).toBe(hashArtifact('a\nb\n'));
+  });
+
+  it('normalizes a lone CR to LF (matching Python universal newlines)', () => {
+    expect(hashArtifact('a\rb')).toBe(hashArtifact('a\nb'));
+  });
+
+  it('produces the digest pinned in the harness suite (cross-language contract)', () => {
+    expect(hashArtifact(G19_FIXTURE_LF)).toBe(G19_FIXTURE_DIGEST);
+    expect(hashArtifact(G19_FIXTURE_CRLF)).toBe(G19_FIXTURE_DIGEST);
+  });
+
+  it('sends the harness an LF-normalized hash for CRLF shownContent', async () => {
+    const cap: { file?: string; args?: string[]; decision?: Record<string, unknown> } = {};
+    const svc = new HarnessFreezeService(['harness'], { runner: okRunner(cap) });
+    await svc.freeze('/i', {
+      artifactId: 'SAD-TEST-001',
+      outcome: 'APPROVE',
+      shownContent: G19_FIXTURE_CRLF,
+      decidedBy: 'Todd',
+    });
+    expect(cap.decision?.content_hash).toBe(G19_FIXTURE_DIGEST);
+  });
+});
+
 describe('HarnessFreezeService', () => {
   it('freezes through the harness CLI and returns the result', async () => {
     const cap: { file?: string; args?: string[]; decision?: Record<string, unknown> } = {};

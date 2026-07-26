@@ -82,8 +82,19 @@ const defaultRunner: CommandRunner = (file, args, cwd) =>
     });
   });
 
+/**
+ * SHA-256 over UTF-8, LF-normalized text — the artifact identity a freeze
+ * decision pins. Line endings are folded to LF (\r\n and lone \r become \n)
+ * before hashing so the digest names the text the human saw, not the platform's
+ * byte encoding of it (G-19): the harness hashes `read_text()` output, where
+ * Python's universal newlines have already folded CRLF, so hashing raw content
+ * here made every freeze of a CRLF-stored artifact fail `hash_mismatch`. Must
+ * stay in lockstep with the harness's `hash_artifact_content` (src/freeze.py);
+ * the convention is recorded in aieos-schema document-control.yaml `maps_to`.
+ */
 export function hashArtifact(content: string): string {
-  return crypto.createHash('sha256').update(content, 'utf-8').digest('hex');
+  const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  return crypto.createHash('sha256').update(normalized, 'utf-8').digest('hex');
 }
 
 export class HarnessFreezeService {
