@@ -1,5 +1,0 @@
-# PRD Template
-
-## Overview
-
-## Requirements

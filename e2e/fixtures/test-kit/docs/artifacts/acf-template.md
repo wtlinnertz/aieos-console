@@ -1,3 +1,0 @@
-# ACF Template
-
-## Criteria

@@ -28,7 +28,7 @@ test.describe.serial('Flow lifecycle', () => {
       data: {
         projectDir: testProjectDir,
         kitConfigs: [
-          { kitId: 'e2e-test-kit', kitPath: testKitDir },
+          { kitId: 'TEK', kitPath: testKitDir },
         ],
         llmConfigs: [
           { providerId: 'mock', model: 'mock-model', apiKeyEnvVar: 'LLM_API_KEY' },
@@ -38,27 +38,27 @@ test.describe.serial('Flow lifecycle', () => {
     expect(response.status()).toBe(200);
   });
 
-  test('GET /api/flow/e2e-test-kit returns flow status with 2 steps', async ({ request }) => {
-    const response = await request.get('/api/flow/e2e-test-kit');
+  test('GET /api/flow/TEK returns flow status with 2 steps', async ({ request }) => {
+    const response = await request.get('/api/flow/TEK');
     expect(response.ok()).toBeTruthy();
     const body = await response.json();
     expect(body.totalSteps).toBe(2);
     expect(body.steps).toHaveLength(2);
-    expect(body.steps[0].step.id).toBe('step-prd');
-    expect(body.steps[1].step.id).toBe('step-acf');
+    expect(body.steps[0].step.id).toBe('req');
+    expect(body.steps[1].step.id).toBe('crit');
     expect(body.completedSteps).toBe(0);
   });
 
-  test('POST initiate step-prd transitions to in-progress', async ({ request }) => {
-    const response = await request.post('/api/flow/e2e-test-kit/step/step-prd/initiate');
+  test('POST initiate prd transitions to in-progress', async ({ request }) => {
+    const response = await request.post('/api/flow/TEK/step/req/initiate');
     expect(response.ok()).toBeTruthy();
     const body = await response.json();
-    expect(body.step.id).toBe('step-prd');
+    expect(body.step.id).toBe('req');
     expect(body.state.status).toBe('in-progress');
   });
 
-  test('GET generate step-prd returns SSE stream with chunks', async ({ request }) => {
-    const response = await request.get('/api/flow/e2e-test-kit/step/step-prd/generate');
+  test('GET generate prd returns SSE stream with chunks', async ({ request }) => {
+    const response = await request.get('/api/flow/TEK/step/req/generate');
     expect(response.ok()).toBeTruthy();
 
     const text = await response.text();
@@ -76,30 +76,30 @@ test.describe.serial('Flow lifecycle', () => {
     expect(doneEvents[0].artifact).toContain('Generated Artifact');
   });
 
-  test('POST validate step-prd returns PASS', async ({ request }) => {
-    const response = await request.post('/api/flow/e2e-test-kit/step/step-prd/validate');
+  test('POST validate prd returns PASS', async ({ request }) => {
+    const response = await request.post('/api/flow/TEK/step/req/validate');
     expect(response.ok()).toBeTruthy();
     const body = await response.json();
     expect(body.status).toBe('PASS');
     expect(body.summary).toBe('All checks passed');
   });
 
-  test('POST freeze step-prd with artifactId succeeds', async ({ request }) => {
-    const response = await request.post('/api/flow/e2e-test-kit/step/step-prd/freeze', {
-      data: { artifactId: 'PRD-E2E-001' },
+  test('POST freeze prd with artifactId succeeds', async ({ request }) => {
+    const response = await request.post('/api/flow/TEK/step/req/freeze', {
+      data: { artifactId: 'REQ-E2E-001' },
     });
     expect(response.ok()).toBeTruthy();
     const body = await response.json();
     expect(body.success).toBe(true);
   });
 
-  test('GET flow status shows step-prd frozen and step-acf available', async ({ request }) => {
-    const response = await request.get('/api/flow/e2e-test-kit');
+  test('GET flow status shows prd frozen and acf available', async ({ request }) => {
+    const response = await request.get('/api/flow/TEK');
     expect(response.ok()).toBeTruthy();
     const body = await response.json();
 
-    const prdStep = body.steps.find((s: { step: { id: string } }) => s.step.id === 'step-prd');
-    const acfStep = body.steps.find((s: { step: { id: string } }) => s.step.id === 'step-acf');
+    const prdStep = body.steps.find((s: { step: { id: string } }) => s.step.id === 'req');
+    const acfStep = body.steps.find((s: { step: { id: string } }) => s.step.id === 'crit');
 
     expect(prdStep.state.status).toBe('frozen');
     expect(acfStep.dependenciesMet).toBe(true);

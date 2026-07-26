@@ -19,7 +19,7 @@ test.describe.serial('Project initialization', () => {
       data: {
         projectDir: testProjectDir,
         kitConfigs: [
-          { kitId: 'e2e-test-kit', kitPath: testKitDir },
+          { kitId: 'TEK', kitPath: testKitDir },
         ],
         llmConfigs: [
           { providerId: 'mock', model: 'mock-model', apiKeyEnvVar: 'LLM_API_KEY' },
@@ -37,7 +37,7 @@ test.describe.serial('Project initialization', () => {
     const body = await response.json();
     expect(body.projectId).toBeDefined();
     expect(body.kitConfigs).toHaveLength(1);
-    expect(body.kitConfigs[0].kitId).toBe('e2e-test-kit');
+    expect(body.kitConfigs[0].kitId).toBe('TEK');
     expect(body.llmConfigs).toHaveLength(1);
     expect(body.artifacts).toEqual([]);
   });
@@ -47,7 +47,7 @@ test.describe.serial('Project initialization', () => {
       data: {
         projectDir: testProjectDir,
         kitConfigs: [
-          { kitId: 'e2e-test-kit', kitPath: testKitDir },
+          { kitId: 'TEK', kitPath: testKitDir },
         ],
         llmConfigs: [
           { providerId: 'mock', model: 'mock-model', apiKeyEnvVar: 'LLM_API_KEY' },
