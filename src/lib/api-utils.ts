@@ -14,6 +14,7 @@ const CONFLICT_ERRORS = new Set([
   'StepNotValidatedPassError',
   'StepNotEditableError',
   'ProjectAlreadyInitializedError',
+  'PrinciplesInputsUnsupportedError',
 ]);
 
 const NOT_FOUND_ERRORS = new Set([

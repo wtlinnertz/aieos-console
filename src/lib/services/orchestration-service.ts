@@ -18,6 +18,7 @@ import type {
 } from './orchestration-types.js';
 import {
   DependenciesNotMetError,
+  PrinciplesInputsUnsupportedError,
   StepAlreadyFrozenError,
   StepNotInProgressError,
   StepNotDraftError,
@@ -26,6 +27,17 @@ import {
   StepNotFoundError,
 } from './errors.js';
 import type { HarnessFreezeService } from './harness-freeze-service.js';
+
+/** FR-023 governance-mode options (manifest flow source only). */
+export interface OrchestrationOptions {
+  /**
+   * A3: artifact types whose prompts declare mandatory principles inputs the
+   * manifest cannot express until `inputs:` lands — generation refused.
+   */
+  denyGenerationFor?: string[];
+  /** D2: mark human-authored entry steps blocked with a machine-readable reason. */
+  entryGatesBlocked?: boolean;
+}
 
 function defaultArtifactState(stepId: string, kitId: string): ArtifactState {
   return {
@@ -45,17 +57,36 @@ export class OrchestrationService implements IOrchestrationService {
   private readonly stateService: IStateService;
   private readonly llmService: ILlmService;
   private readonly freezeService: HarnessFreezeService | null;
+  private readonly denyGenerationFor: Set<string>;
+  private readonly entryGatesBlocked: boolean;
 
   constructor(
     kitService: IKitService,
     stateService: IStateService,
     llmService: ILlmService,
     freezeService: HarnessFreezeService | null = null,
+    options: OrchestrationOptions = {},
   ) {
     this.kitService = kitService;
     this.stateService = stateService;
     this.llmService = llmService;
     this.freezeService = freezeService;
+    this.denyGenerationFor = new Set(options.denyGenerationFor ?? []);
+    this.entryGatesBlocked = options.entryGatesBlocked ?? false;
+  }
+
+  /** FR-023 D2/A3: why this step cannot be driven right now, or null. */
+  private blockedReasonFor(step: FlowStep): string | null {
+    if (this.entryGatesBlocked && step.stepType === 'human-intake') {
+      return 'ENTRY_INPUTS_UNSUPPORTED';
+    }
+    if (
+      step.stepType === 'llm-generated' &&
+      this.denyGenerationFor.has(step.artifactType)
+    ) {
+      return 'PRINCIPLES_INPUTS_UNSUPPORTED';
+    }
+    return null;
   }
 
   async getFlowStatus(projectDir: string, kitId: string): Promise<FlowStatus> {
@@ -81,6 +112,7 @@ export class OrchestrationService implements IOrchestrationService {
         state,
         dependenciesMet,
         isCurrentStep: false,
+        blockedReason: this.blockedReasonFor(step),
       });
     }
 
@@ -174,6 +206,20 @@ export class OrchestrationService implements IOrchestrationService {
     const kitPath = await this.resolveKitPath(projectDir, kitId);
     const kit = await this.kitService.loadKit(kitPath);
     const step = this.findStep(kit.flow.steps, stepId);
+
+    // A3 (FR-023): never generate an artifact whose mandatory principles
+    // inputs the flow source cannot yet express — it would be frozen without
+    // its governance inputs.
+    if (
+      step.stepType === 'llm-generated' &&
+      this.denyGenerationFor.has(step.artifactType)
+    ) {
+      throw new PrinciplesInputsUnsupportedError(
+        `Artifact type "${step.artifactType}" requires principles inputs ` +
+          'the manifest cannot express yet (lands with manifest inputs:); ' +
+          'generation refused',
+      );
+    }
 
     // Verify step is in-progress or draft (allow re-generation)
     let currentState: ArtifactState;
@@ -406,12 +452,22 @@ export class OrchestrationService implements IOrchestrationService {
       projectDir,
       currentState.artifactPath,
     );
-    await this.freezeService.freeze(projectDir, {
+    const result = await this.freezeService.freeze(projectDir, {
       artifactId,
       outcome: 'APPROVE',
       shownContent,
       decidedBy: 'console-user',
     });
+
+    // N2 (FR-023): honour the canonical status the harness actually returned
+    // (G-14 stopped at the service layer; the caller used to hardcode
+    // 'frozen'). Anything other than FROZEN leaves local state untouched.
+    if (result.status !== 'FROZEN') {
+      throw new Error(
+        `Harness returned status ${result.status} for "${artifactId}" — ` +
+          'not FROZEN; local state left unchanged',
+      );
+    }
 
     // Reflect the harness's canonical FROZEN write in the local cache.
     await this.stateService.updateArtifactState(projectDir, stepId, {

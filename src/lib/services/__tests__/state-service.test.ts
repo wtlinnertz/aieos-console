@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as path from 'node:path';
 import { StateService } from '../state-service.js';
 import type { IFilesystemService } from '../filesystem-service.js';
 import type { ProjectState } from '../state-types.js';
@@ -51,9 +52,9 @@ describe('StateService', () => {
 
       await service.initializeProject('/project', kitConfigs, llmConfigs);
 
-      expect(mockFs.createDirectory).toHaveBeenCalledWith('/project/.aieos');
+      expect(mockFs.createDirectory).toHaveBeenCalledWith(path.join('/project', '.aieos'));
       expect(mockFs.writeFileAtomic).toHaveBeenCalledWith(
-        '/project/.aieos/state.json',
+        path.join('/project', '.aieos', 'state.json'),
         expect.any(String),
       );
 

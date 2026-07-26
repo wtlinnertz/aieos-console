@@ -108,6 +108,32 @@ export function FlowStepper({ flowStatus, kitId }: FlowStepperProps) {
                     Dependencies not met
                   </span>
                 )}
+                {stepStatus.blockedReason && (
+                  <span
+                    data-testid={`blocked-${stepStatus.step.id}`}
+                    data-reason-code={stepStatus.blockedReason}
+                    title={stepStatus.blockedReason}
+                    style={{
+                      fontSize: '12px',
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      fontWeight: 600,
+                      color: '#92400e',
+                      backgroundColor: '#fef3c7',
+                    }}
+                  >
+                    Blocked: {stepStatus.blockedReason}
+                  </span>
+                )}
+                {(stepStatus.step.upstreamPreconditions?.length ?? 0) > 0 && (
+                  <span
+                    data-testid={`preconditions-${stepStatus.step.id}`}
+                    style={{ fontSize: '12px', color: '#374151' }}
+                  >
+                    Requires FROZEN:{' '}
+                    {stepStatus.step.upstreamPreconditions?.join(', ')}
+                  </span>
+                )}
               </div>
             </Link>
           </li>

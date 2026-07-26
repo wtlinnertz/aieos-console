@@ -231,3 +231,15 @@ export class ConventionResolutionError extends Error {
     this.name = 'ConventionResolutionError';
   }
 }
+
+/**
+ * A3 (FR-023): the artifact's prompt declares mandatory principles inputs
+ * that the manifest cannot express until `inputs:` lands — generating it
+ * without them would freeze an artifact missing its governance inputs.
+ */
+export class PrinciplesInputsUnsupportedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PrinciplesInputsUnsupportedError';
+  }
+}

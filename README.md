@@ -90,6 +90,14 @@ Then open [http://localhost:3000](http://localhost:3000).
 | `LLM_API_KEY` | Yes | API key for the LLM provider |
 | `LLM_MODEL` | Yes | Model identifier (e.g., `claude-sonnet-4-20250514`) |
 | `PORT` | No | Server port (default: `3000`) |
+| `FLOW_SOURCE` | No | `manifest` (default): flows derive from `kit-manifest.yml` (FR-023). `flow-yaml`: legacy per-kit `flow.yaml` loader (kept ≥1 release as the rollback path) |
+| `KIT_ROOT` | manifest mode | Directory containing the kit checkouts, including `aieos-governance-foundation` |
+| `MANIFEST_PATH` | No | Explicit path to `kit-manifest.yml` (default: `<KIT_ROOT>/aieos-governance-foundation/kit-manifest.yml`). Missing/unparseable/version-skewed manifests fail closed — see `/api/health` |
+| `HARNESS_CMD` | for freeze | Harness invocation. Preferred: a JSON string array, e.g. `["python","-m","src.cli"]` — safe for paths with spaces. A plain string is split on spaces. On Windows the default `harness` is not invokable by `execFile` (no console script; a `.cmd` shim needs a shell) — use the JSON form with `python` |
+| `HARNESS_CWD` | for freeze | Working directory for the harness invocation (the `aieos-agent-harness` checkout when using `python -m src.cli`) |
+
+The derived flow for any kit is inspectable at `GET /api/flow/{ABBR}/derived`
+(e.g. `/api/flow/QAK/derived`) when `FLOW_SOURCE=manifest`.
 
 ## Development
 

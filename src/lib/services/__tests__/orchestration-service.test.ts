@@ -163,7 +163,9 @@ function makeMockStateService(
 function makeMockFreezeService() {
   return {
     freeze: vi.fn().mockResolvedValue({
-      status: 'frozen',
+      // Canonical FR-018 vocabulary (G-14): the harness reports 'FROZEN',
+      // and freezeArtifact rejects anything else.
+      status: 'FROZEN',
       artifactId: 'PRD-TEST-001',
       path: 'docs/sdlc/01-prd.md',
       frozenCount: 1,

@@ -52,6 +52,7 @@ function makeStepStatus(
     },
     dependenciesMet: true,
     isCurrentStep: false,
+    blockedReason: null,
     ...rest,
   };
 }

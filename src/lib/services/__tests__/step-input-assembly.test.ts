@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import * as path from 'node:path';
 import { assembleStepInputs } from '../step-input-assembly.js';
 import type { IArtifactStateProvider } from '../step-input-assembly.js';
 import type { IFilesystemService } from '../filesystem-service.js';
@@ -38,8 +39,11 @@ function makeMockFs(
 ): IFilesystemService {
   return {
     readFile: vi.fn().mockImplementation(async (p: string) => {
-      if (p in fileContents) {
-        return { content: fileContents[p], encoding: 'utf-8' as const };
+      // Production joins paths with path.join (backslashes on Windows);
+      // normalize so lookups hit the forward-slash-keyed fixture map.
+      const key = p.replace(/\\/g, '/');
+      if (key in fileContents) {
+        return { content: fileContents[key], encoding: 'utf-8' as const };
       }
       throw new Error(`File not found: ${p}`);
     }),
@@ -320,10 +324,10 @@ describe('assembleStepInputs', () => {
         mockFs, makeFlow(), kitPath, 'step-1', projectDir, makeArtifactState(),
       );
 
-      expect(mockFs.readFile).toHaveBeenCalledWith('/kits/pik/docs/specs/prd-spec.md');
-      expect(mockFs.readFile).toHaveBeenCalledWith('/kits/pik/docs/artifacts/prd-template.md');
-      expect(mockFs.readFile).toHaveBeenCalledWith('/kits/pik/docs/prompts/prd-prompt.md');
-      expect(mockFs.readFile).toHaveBeenCalledWith('/kits/pik/docs/validators/prd-validator.md');
+      expect(mockFs.readFile).toHaveBeenCalledWith(path.join(kitPath, 'docs/specs/prd-spec.md'));
+      expect(mockFs.readFile).toHaveBeenCalledWith(path.join(kitPath, 'docs/artifacts/prd-template.md'));
+      expect(mockFs.readFile).toHaveBeenCalledWith(path.join(kitPath, 'docs/prompts/prd-prompt.md'));
+      expect(mockFs.readFile).toHaveBeenCalledWith(path.join(kitPath, 'docs/validators/prd-validator.md'));
     });
   });
 });

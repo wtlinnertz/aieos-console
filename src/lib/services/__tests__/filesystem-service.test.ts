@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, type TestContext } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -14,7 +14,12 @@ describe('FilesystemService', () => {
   let service: FilesystemService;
 
   beforeEach(async () => {
-    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'fs-test-'));
+    // realpath: GitHub's Windows runners hand out an 8.3 short-name tmpdir
+    // (RUNNERADM~1) while the sandbox resolves canonical long paths — the
+    // boundary check must be configured with the canonical form.
+    tmpDir = await fs.realpath(
+      await fs.mkdtemp(path.join(os.tmpdir(), 'fs-test-')),
+    );
     service = new FilesystemService({
       projectDir: tmpDir,
       kitDirs: [],
@@ -165,17 +170,38 @@ describe('FilesystemService', () => {
   });
 
   describe('symlink path validation', () => {
-    it('AT-4: throws PathViolationError for symlink resolving outside boundaries', async () => {
+    // Creates a symlink, or skips the test when the platform forbids it
+    // (Windows without Developer Mode/admin reports EPERM or EACCES).
+    // GitHub windows-latest runners CAN create symlinks, so these tests
+    // still run there — this is a capability check, not a platform skip.
+    async function symlinkOrSkip(
+      ctx: TestContext,
+      target: string,
+      linkPath: string,
+    ): Promise<void> {
+      try {
+        await fs.symlink(target, linkPath);
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code === 'EPERM' || code === 'EACCES') {
+          ctx.skip();
+        }
+        throw err;
+      }
+    }
+
+    it('AT-4: throws PathViolationError for symlink resolving outside boundaries', async (ctx) => {
       const outsideTarget = await fs.mkdtemp(
         path.join(os.tmpdir(), 'outside-'),
       );
-      const outsideFile = path.join(outsideTarget, 'secret.txt');
-      await fs.writeFile(outsideFile, 'secret data');
-
-      const symlinkPath = path.join(tmpDir, 'escape-link');
-      await fs.symlink(outsideFile, symlinkPath);
 
       try {
+        const outsideFile = path.join(outsideTarget, 'secret.txt');
+        await fs.writeFile(outsideFile, 'secret data');
+
+        const symlinkPath = path.join(tmpDir, 'escape-link');
+        await symlinkOrSkip(ctx, outsideFile, symlinkPath);
+
         await expect(service.readFile(symlinkPath)).rejects.toThrow(
           PathViolationError,
         );
@@ -184,11 +210,11 @@ describe('FilesystemService', () => {
       }
     });
 
-    it('allows symlink that resolves within boundaries', async () => {
+    it('allows symlink that resolves within boundaries', async (ctx) => {
       const realFile = path.join(tmpDir, 'real.txt');
       await fs.writeFile(realFile, 'real content');
       const linkPath = path.join(tmpDir, 'link.txt');
-      await fs.symlink(realFile, linkPath);
+      await symlinkOrSkip(ctx, realFile, linkPath);
 
       const result = await service.readFile(linkPath);
       expect(result.content).toBe('real content');
@@ -394,7 +420,9 @@ describe('FilesystemService', () => {
 
   describe('multiple kit directories', () => {
     it('accepts paths within any configured kit directory', async () => {
-      const kitDir = await fs.mkdtemp(path.join(os.tmpdir(), 'kit-'));
+      const kitDir = await fs.realpath(
+        await fs.mkdtemp(path.join(os.tmpdir(), 'kit-')),
+      );
       const kitFile = path.join(kitDir, 'flow.yaml');
       await fs.writeFile(kitFile, 'kit: test');
 

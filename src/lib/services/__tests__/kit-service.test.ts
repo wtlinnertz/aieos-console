@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as path from 'node:path';
 import { KitService } from '../kit-service.js';
 import type { IFilesystemService } from '../filesystem-service.js';
 import {
@@ -63,7 +64,7 @@ describe('KitService', () => {
       expect(result.flow.kit.id).toBe('test-kit');
       expect(result.flow.steps).toHaveLength(1);
       expect(result.flow.steps[0].id).toBe('step-1');
-      expect(mockFs.readFile).toHaveBeenCalledWith('/kits/pik/flow.yaml');
+      expect(mockFs.readFile).toHaveBeenCalledWith(path.join('/kits/pik', 'flow.yaml'));
     });
 
     it('AT-2: missing four-file throws error identifying the file', async () => {
@@ -185,10 +186,10 @@ steps:
     it('EC-5: four-file paths resolved relative to kit directory', async () => {
       await service.loadKit('/kits/pik');
 
-      expect(mockFs.exists).toHaveBeenCalledWith('/kits/pik/docs/specs/prd-spec.md');
-      expect(mockFs.exists).toHaveBeenCalledWith('/kits/pik/docs/artifacts/prd-template.md');
-      expect(mockFs.exists).toHaveBeenCalledWith('/kits/pik/docs/prompts/prd-prompt.md');
-      expect(mockFs.exists).toHaveBeenCalledWith('/kits/pik/docs/validators/prd-validator.md');
+      expect(mockFs.exists).toHaveBeenCalledWith(path.join('/kits/pik', 'docs/specs/prd-spec.md'));
+      expect(mockFs.exists).toHaveBeenCalledWith(path.join('/kits/pik', 'docs/artifacts/prd-template.md'));
+      expect(mockFs.exists).toHaveBeenCalledWith(path.join('/kits/pik', 'docs/prompts/prd-prompt.md'));
+      expect(mockFs.exists).toHaveBeenCalledWith(path.join('/kits/pik', 'docs/validators/prd-validator.md'));
     });
   });
 });
