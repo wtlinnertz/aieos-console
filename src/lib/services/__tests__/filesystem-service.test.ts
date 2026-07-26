@@ -14,7 +14,12 @@ describe('FilesystemService', () => {
   let service: FilesystemService;
 
   beforeEach(async () => {
-    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'fs-test-'));
+    // realpath: GitHub's Windows runners hand out an 8.3 short-name tmpdir
+    // (RUNNERADM~1) while the sandbox resolves canonical long paths — the
+    // boundary check must be configured with the canonical form.
+    tmpDir = await fs.realpath(
+      await fs.mkdtemp(path.join(os.tmpdir(), 'fs-test-')),
+    );
     service = new FilesystemService({
       projectDir: tmpDir,
       kitDirs: [],
@@ -415,7 +420,9 @@ describe('FilesystemService', () => {
 
   describe('multiple kit directories', () => {
     it('accepts paths within any configured kit directory', async () => {
-      const kitDir = await fs.mkdtemp(path.join(os.tmpdir(), 'kit-'));
+      const kitDir = await fs.realpath(
+        await fs.mkdtemp(path.join(os.tmpdir(), 'kit-')),
+      );
       const kitFile = path.join(kitDir, 'flow.yaml');
       await fs.writeFile(kitFile, 'kit: test');
 
