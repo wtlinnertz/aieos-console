@@ -11,9 +11,20 @@ export interface StepViewProps {
   step: FlowStep;
   state: ArtifactState;
   kitId: string;
+  /** FR-023 D2/A3: machine-readable reason this step cannot be driven. */
+  blockedReason?: string | null;
 }
 
-export function StepView({ step, state, kitId }: StepViewProps) {
+const BLOCKED_REASON_TEXT: Record<string, string> = {
+  ENTRY_INPUTS_UNSUPPORTED:
+    'Human-authored entry gate — provide the artifact on disk; autonomous ' +
+    'drive lands with manifest inputs:.',
+  PRINCIPLES_INPUTS_UNSUPPORTED:
+    'This artifact requires principles inputs the manifest cannot express ' +
+    'yet — generation is disabled until manifest inputs: lands.',
+};
+
+export function StepView({ step, state, kitId, blockedReason }: StepViewProps) {
   const [showStream, setShowStream] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [isFreezing, setIsFreezing] = useState(false);
@@ -106,6 +117,37 @@ export function StepView({ step, state, kitId }: StepViewProps) {
         <p data-testid="step-error" style={{ color: '#dc2626' }}>
           {error}
         </p>
+      )}
+
+      {blockedReason && (
+        <div
+          data-testid="blocked-reason"
+          data-reason-code={blockedReason}
+          style={{
+            padding: '8px 12px',
+            borderRadius: '4px',
+            backgroundColor: '#fef3c7',
+            color: '#92400e',
+            marginBottom: '12px',
+          }}
+        >
+          {BLOCKED_REASON_TEXT[blockedReason] ?? blockedReason}
+        </div>
+      )}
+
+      {(step.upstreamPreconditions?.length ?? 0) > 0 && (
+        <div data-testid="upstream-preconditions" style={{ marginBottom: '12px' }}>
+          <p style={{ fontWeight: 600, marginBottom: '4px' }}>
+            Upstream preconditions (must be FROZEN):
+          </p>
+          <ul>
+            {step.upstreamPreconditions?.map((ref) => (
+              <li key={ref} data-testid={`precondition-${ref}`}>
+                {ref}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {step.stepType === 'llm-generated' && (

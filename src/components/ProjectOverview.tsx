@@ -21,7 +21,10 @@ export default function ProjectOverview({ state }: ProjectOverviewProps) {
         <ul>
           {state.kitConfigs.map((kit) => (
             <li key={kit.kitId}>
-              <a href={`/flow/${kit.kitId}`}>{kit.kitId}</a> &mdash; {kit.kitPath}
+              {/* FR-023 Q2: kitId is the manifest abbreviation, never a path;
+                  encodeURIComponent stays as defense-in-depth. */}
+              <a href={`/flow/${encodeURIComponent(kit.kitId)}`}>{kit.kitId}</a>{' '}
+              &mdash; {kit.kitPath}
             </li>
           ))}
         </ul>

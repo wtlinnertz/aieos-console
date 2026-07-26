@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as path from 'node:path';
 import { StateService } from '../state-service.js';
 import type { IFilesystemService } from '../filesystem-service.js';
 import type { ProjectState, ArtifactState, LlmUsageRecord } from '../state-types.js';
@@ -227,14 +228,14 @@ describe('State Transitions', () => {
 
       const resultPath = await service.saveArtifact('/project', 'step-1', '# PRD Content', '01-prd.md');
 
-      expect(resultPath).toBe('docs/sdlc/01-prd.md');
+      expect(resultPath).toBe(path.join('docs', 'sdlc', '01-prd.md'));
       expect(mockFs.writeFileAtomic).toHaveBeenCalledWith(
-        '/project/docs/sdlc/01-prd.md',
+        path.join('/project', 'docs', 'sdlc', '01-prd.md'),
         '# PRD Content',
       );
 
       const artifact = await service.getArtifactState('/project', 'step-1');
-      expect(artifact.artifactPath).toBe('docs/sdlc/01-prd.md');
+      expect(artifact.artifactPath).toBe(path.join('docs', 'sdlc', '01-prd.md'));
     });
   });
 
@@ -273,7 +274,7 @@ describe('State Transitions', () => {
       );
 
       expect(mockFs.writeFileAtomic).toHaveBeenCalledWith(
-        '/project/docs/engagement/er.md',
+        path.join('/project', 'docs', 'engagement', 'er.md'),
         expect.stringContaining('PRD-TEST-001'),
       );
     });

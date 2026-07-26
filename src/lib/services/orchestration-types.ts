@@ -14,6 +14,12 @@ export interface StepStatus {
   state: ArtifactState;
   dependenciesMet: boolean;
   isCurrentStep: boolean;
+  /**
+   * FR-023 D2/A3: machine-readable reason this step cannot be driven right
+   * now (e.g. ENTRY_INPUTS_UNSUPPORTED, PRINCIPLES_INPUTS_UNSUPPORTED), or
+   * null when drivable. Never a silent no-op.
+   */
+  blockedReason: string | null;
 }
 
 export interface StepContext {
