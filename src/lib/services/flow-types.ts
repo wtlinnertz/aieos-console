@@ -20,7 +20,17 @@ export interface FlowStep {
     prompt: string | null;
     validator: string;
   };
-  requiredInputs: { path: string; role: string }[];
+  requiredInputs: {
+    path: string;
+    role: string;
+    /**
+     * G-3 (manifest 1.1): 'framework' inputs are kit-relative and mandatory
+     * (principles); 'human' inputs are initiative-relative and optional (the
+     * entry brief). Absent on legacy flow.yaml inputs (kit-relative,
+     * mandatory — unchanged behavior).
+     */
+    source?: 'framework' | 'human';
+  }[];
   produces: { artifactIdPrefix: string; outputFilename: string };
   freezeGate: boolean;
   /**

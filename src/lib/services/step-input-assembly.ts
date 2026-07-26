@@ -48,7 +48,14 @@ export async function assembleStepInputs(
 
   const requiredInputs: NamedInput[] = [];
   for (const input of step.requiredInputs) {
-    const fullPath = path.join(kitPath, input.path);
+    // G-3 (manifest 1.1): human inputs (the entry brief) live in the
+    // initiative and are entry-path-dependent — optional when absent.
+    // Framework inputs (principles) and legacy flow.yaml inputs are
+    // kit-relative and mandatory.
+    const isHuman = input.source === 'human';
+    const fullPath = isHuman
+      ? path.join(projectDir, input.path)
+      : path.join(kitPath, input.path);
     try {
       const result = await fs.readFile(fullPath);
       requiredInputs.push({
@@ -57,6 +64,9 @@ export async function assembleStepInputs(
         content: result.content,
       });
     } catch {
+      if (isHuman) {
+        continue;
+      }
       throw new InputFileNotFoundError(
         `Required input file not found: ${fullPath}`,
       );

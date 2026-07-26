@@ -28,9 +28,20 @@ const EEK = kit({
   abbr: 'EEK',
   artifacts: [
     // KER is one of the nine divergent artifacts: token != id.toLowerCase()
-    { id: 'KER', fullName: 'Kit Entry Record', specFile: 'kit-entry-spec.md', humanAuthored: true, optional: false },
-    { id: 'PRD', fullName: 'Product Requirements Document', specFile: 'prd-spec.md', humanAuthored: false, optional: false },
-    { id: 'SAD', fullName: 'Solution Architecture Document', specFile: 'sad-spec.md', humanAuthored: false, optional: false },
+    { id: 'KER', fullName: 'Kit Entry Record', specFile: 'kit-entry-spec.md', humanAuthored: true, optional: false, inputs: [] },
+    {
+      id: 'PRD',
+      fullName: 'Product Requirements Document',
+      specFile: 'prd-spec.md',
+      humanAuthored: false,
+      optional: false,
+      inputs: [
+        { ref: 'docs/brief.md', role: 'brief', source: 'human' },
+        { ref: 'docs/principles/product-craftsmanship.md', role: 'principles', source: 'framework' },
+        { ref: 'ignored', role: 'x', source: 'upstream' },
+      ],
+    },
+    { id: 'SAD', fullName: 'Solution Architecture Document', specFile: 'sad-spec.md', humanAuthored: false, optional: false, inputs: [] },
   ],
   artifactFlow: ['KER', 'PRD', 'SAD'],
 });
@@ -38,7 +49,7 @@ const EEK = kit({
 const REK = kit({
   abbr: 'REK',
   artifacts: [
-    { id: 'RER', fullName: 'Release Entry Record', specFile: 'release-entry-spec.md', humanAuthored: true, optional: false },
+    { id: 'RER', fullName: 'Release Entry Record', specFile: 'release-entry-spec.md', humanAuthored: true, optional: false, inputs: [] },
   ],
   artifactFlow: ['RER'],
 });
@@ -90,6 +101,19 @@ describe('deriveFlow', () => {
     expect(rer.dependencies).toEqual([]);
   });
 
+  it('maps declared inputs to requiredInputs; upstream entries filtered (G-3)', () => {
+    const flow = deriveFlow('EEK', manifest([EEK, REK], EDGES));
+    expect(flow.steps[1].requiredInputs).toEqual([
+      { path: 'docs/brief.md', role: 'brief', source: 'human' },
+      {
+        path: 'docs/principles/product-craftsmanship.md',
+        role: 'principles',
+        source: 'framework',
+      },
+    ]);
+    expect(flow.steps[2].requiredInputs).toEqual([]);
+  });
+
   it('fails fast on an artifact_flow entry with no artifacts[] declaration', () => {
     const broken = kit({
       abbr: 'BAD',
@@ -113,7 +137,7 @@ describe('tokenFor', () => {
     const bad = kit({
       abbr: 'BAD',
       artifacts: [
-        { id: 'X', fullName: 'X', specFile: 'x-specification.md', humanAuthored: false, optional: false },
+        { id: 'X', fullName: 'X', specFile: 'x-specification.md', humanAuthored: false, optional: false, inputs: [] },
       ],
       artifactFlow: ['X'],
     });
