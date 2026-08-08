@@ -1,3 +1,4 @@
+import { logInfo } from '../logger.js';
 import type { IKitService } from './kit-service.js';
 import type { IStateService } from './state-service.js';
 import type { ILlmService } from './llm-types.js';
@@ -479,6 +480,9 @@ export class OrchestrationService implements IOrchestrationService {
     }
 
     let artifactPath: string | null = null;
+    // G-22: an N1 freeze adopts state the console never drove, so it must be
+    // recorded by adoption rather than by a lifecycle transition.
+    let canonicalSourced = false;
     if (cachedState?.status === 'validated-pass' && cachedState.artifactPath) {
       artifactPath = cachedState.artifactPath;
     } else {
@@ -496,6 +500,7 @@ export class OrchestrationService implements IOrchestrationService {
         canonical?.block.status === 'VALIDATED'
       ) {
         artifactPath = canonical.relativePath;
+        canonicalSourced = true;
       } else {
         throw new StepNotValidatedPassError(
           `Step "${stepId}" is "${cachedState?.status ?? 'not-started'}" and ` +
@@ -528,6 +533,18 @@ export class OrchestrationService implements IOrchestrationService {
       decidedBy: 'console-user',
     });
 
+    // G-22 fix (3): the authoritative write has happened by this point. Log it
+    // BEFORE recording, so that "the harness froze it and the console failed to
+    // record it" is distinguishable from "the freeze never happened" — the two
+    // states G-22 made indistinguishable from the terminal.
+    logInfo('harness_freeze_returned', {
+      stepId,
+      artifactId,
+      status: result.status,
+      frozenCount: result.frozenCount,
+      artifactPath,
+    });
+
     // N2 (FR-023): honour the canonical status the harness actually returned
     // (G-14 stopped at the service layer; the caller used to hardcode
     // 'frozen'). Anything other than FROZEN leaves local state untouched.
@@ -539,11 +556,32 @@ export class OrchestrationService implements IOrchestrationService {
     }
 
     // Reflect the harness's canonical FROZEN write in the local cache.
-    await this.stateService.updateArtifactState(projectDir, stepId, {
-      status: 'frozen',
+    //
+    // G-22: ordering is load-bearing. The harness write above is the
+    // authoritative, already-committed one; recording follows it. Never
+    // reverse these — a cache claiming FROZEN for an artifact the harness did
+    // not freeze is corruption, where the reverse is only a stale cache.
+    const record = {
+      status: 'frozen' as const,
       artifactId,
       artifactPath,
       frozenAt: new Date().toISOString(),
+    };
+    if (canonicalSourced) {
+      // No console-side history to transition from — FR-018/N1 by design.
+      await this.stateService.adoptCanonicalState(projectDir, stepId, record);
+    } else {
+      await this.stateService.updateArtifactState(projectDir, stepId, record);
+    }
+
+    // `recordedVia` is the G-22 distinction itself, and it is invisible from
+    // outside the process. Without it, an N1 cross-driver freeze and a
+    // console-driven one are indistinguishable after the fact.
+    logInfo('freeze_recorded', {
+      stepId,
+      artifactId,
+      artifactPath,
+      recordedVia: canonicalSourced ? 'adoption' : 'transition',
     });
   }
 

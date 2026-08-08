@@ -41,6 +41,26 @@ export interface IStateService {
     stepId: string,
     update: Partial<ArtifactState>,
   ): Promise<void>;
+  /**
+   * G-22 (FR-018/N1): record state this console did not drive.
+   *
+   * `updateArtifactState` validates lifecycle TRANSITIONS — moves the console
+   * itself makes. An artifact another driver produced and the harness
+   * authoritatively froze has no console history to transition from, so the
+   * table correctly rejects it (`not-started -> frozen`). That rejection fired
+   * AFTER the harness had already committed FROZEN to disk, leaving the write
+   * correct and unrecorded, and the operator told "Internal server error".
+   *
+   * Adoption is not a transition. It writes the canonical outcome as observed.
+   * Deliberately no `validateTransition` call: widening VALID_TRANSITIONS
+   * instead would let a console-driven artifact skip generate and validate,
+   * weakening the invariant that table exists to protect.
+   */
+  adoptCanonicalState(
+    projectDir: string,
+    stepId: string,
+    state: Partial<ArtifactState>,
+  ): Promise<void>;
   saveArtifact(
     projectDir: string,
     stepId: string,
@@ -170,6 +190,38 @@ export class StateService implements IStateService {
 
       state.artifacts[idx] = {
         ...current,
+        ...update,
+        lastModified: new Date().toISOString(),
+      };
+    }
+
+    await this.persistState(projectDir, state);
+  }
+
+  /** G-22: see IStateService.adoptCanonicalState. */
+  async adoptCanonicalState(
+    projectDir: string,
+    stepId: string,
+    update: Partial<ArtifactState>,
+  ): Promise<void> {
+    const state = await this.loadState(projectDir);
+    const idx = state.artifacts.findIndex((a) => a.stepId === stepId);
+
+    if (idx === -1) {
+      state.artifacts.push({
+        stepId,
+        kitId: '',
+        artifactId: null,
+        status: 'not-started',
+        artifactPath: null,
+        validationResult: null,
+        frozenAt: null,
+        ...update,
+        lastModified: new Date().toISOString(),
+      } as ArtifactState);
+    } else {
+      state.artifacts[idx] = {
+        ...state.artifacts[idx],
         ...update,
         lastModified: new Date().toISOString(),
       };
