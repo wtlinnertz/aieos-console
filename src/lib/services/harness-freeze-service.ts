@@ -5,6 +5,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { isFreezeStatus, type FreezeStatus } from '@/lib/freeze-status';
+import { logError } from '@/lib/logger';
 
 /**
  * HarnessFreezeService — the console's freeze seam (ADR-0003).
@@ -154,19 +155,46 @@ export class HarnessFreezeService {
         } catch {
           err = { error: 'harness_failed', message: (stderr || '').trim() };
         }
-        throw new HarnessFreezeError(
-          err.error ?? 'harness_failed',
-          err.message ?? `harness freeze exited ${code}`,
-        );
+        const harnessCode = err.error ?? 'harness_failed';
+        const harnessMessage = err.message ?? `harness freeze exited ${code}`;
+        // G-22 fix (3): this seam used to fail in total silence — the console
+        // returned a generic 500 and the terminal printed nothing, so the
+        // structured code the harness had gone to the trouble of emitting was
+        // lost at exactly the moment it was needed.
+        logError('harness_freeze_failed', {
+          code: harnessCode,
+          exitCode: code,
+          message: harnessMessage,
+          artifactId: request.artifactId,
+          initiativeDir,
+        });
+        throw new HarnessFreezeError(harnessCode, harnessMessage);
       }
 
-      const parsed = JSON.parse(stdout) as {
+      let parsed: {
         status: string;
         artifact_id: string;
         path: string;
         frozen_count: number | null;
         decided_by: string;
       };
+      try {
+        parsed = JSON.parse(stdout) as typeof parsed;
+      } catch {
+        // Unguarded JSON.parse used to throw a bare SyntaxError with no trace
+        // and no harness context — indistinguishable, from the outside, from
+        // any other internal fault. Any stray line on stdout lands here.
+        logError('harness_freeze_unparseable', {
+          artifactId: request.artifactId,
+          exitCode: code,
+          stdoutPreview: stdout.slice(0, 200),
+          stderrPreview: stderr.slice(0, 200),
+        });
+        throw new HarnessFreezeError(
+          'unparseable_output',
+          `harness freeze returned unparseable stdout for "${request.artifactId}"`,
+        );
+      }
       // G-14: consume what the harness reported, in the canonical vocabulary.
       // Reject anything outside it rather than coercing -- a status we don't
       // recognise means the seam has drifted, and silently rewriting it to

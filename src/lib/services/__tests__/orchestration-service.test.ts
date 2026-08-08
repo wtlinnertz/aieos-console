@@ -153,6 +153,26 @@ function makeMockStateService(
         return Promise.resolve();
       },
     ),
+    // G-22: records canonical state the console did not drive (FR-018/N1).
+    // No transition validation by design — see IStateService.
+    adoptCanonicalState: vi.fn().mockImplementation(
+      (_dir: string, stepId: string, update: Partial<ArtifactState>) => {
+        const existing = artifactStates.get(stepId);
+        artifactStates.set(stepId, {
+          stepId,
+          kitId: 'test-kit',
+          artifactId: null,
+          status: 'not-started',
+          artifactPath: null,
+          validationResult: null,
+          frozenAt: null,
+          ...existing,
+          ...update,
+          lastModified: new Date().toISOString(),
+        } as ArtifactState);
+        return Promise.resolve();
+      },
+    ),
     saveArtifact: vi.fn().mockResolvedValue('docs/sdlc/01-prd.md'),
     readArtifact: vi.fn().mockResolvedValue('# PRD\n\nshown content\n'),
     recordLlmUsage: vi.fn().mockResolvedValue(undefined),
